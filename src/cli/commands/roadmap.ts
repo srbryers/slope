@@ -66,7 +66,7 @@ import {
 import { serializeRoadmapMigrationMappingTemplate } from '../../core/roadmap-migration.js';
 import { resolveActor } from '../actor.js';
 import { resolveStore, storeAlreadyExists } from '../store.js';
-import { readCompletedTicketKeysOrEmpty, selectNextTicket } from '../../core/index.js';
+import { isTicketComplete, readCompletedTicketKeysOrEmpty, selectNextTicket } from '../../core/index.js';
 import type { SprintClaim } from '../../core/index.js';
 
 // --- Helpers ---
@@ -1115,7 +1115,7 @@ function printCompactRoadmapStatus(
   // Same rule as `slope now` and `agent status`. Ignoring claims here was the
   // last of the three disagreeing policies (#697).
   const nextSelection = selectNextTicket({
-    tickets: (current?.tickets ?? []).map(t => t.key),
+    tickets: current?.tickets ?? [],
     completed: completedTickets,
     claimedBySelf: new Set(claims.filter(c => c.player === self).map(c => c.target)),
     claimedByOthers: new Set(claims.filter(c => c.player !== self).map(c => c.target)),
@@ -1151,7 +1151,7 @@ function printCompactRoadmapStatus(
       console.log(`  Dependencies: ${deps.join(', ')}`);
     }
     for (const ticket of current.tickets ?? []) {
-      const mark = completedTickets.has(ticket.key)
+      const mark = isTicketComplete(ticket, completedTickets)
         ? ' [done]'
         : claimedTargets.has(ticket.key) ? ' [claimed]' : '';
       console.log(`  - ${ticket.key}: ${ticket.title}${mark}`);

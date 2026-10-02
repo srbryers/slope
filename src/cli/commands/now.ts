@@ -16,6 +16,7 @@ import { resolveStore, storeAlreadyExists } from '../store.js';
 import { resolveActor } from '../actor.js';
 import {
   readCompletedTicketKeysOrEmpty,
+  isTicketComplete,
   selectNextTicket,
   type NextTicketReason,
 } from '../../core/index.js';
@@ -113,7 +114,7 @@ function findNextTicket(
   // One shared rule across `now`, `agent status` and roadmap status, so a live
   // claim stops producing two different answers (#697).
   const result = selectNextTicket({
-    tickets: sprint.tickets.map(t => t.key),
+    tickets: sprint.tickets,
     completed,
     claimedBySelf: new Set(claims.filter(c => c.player === self).map(c => c.target)),
     claimedByOthers: new Set(claims.filter(c => c.player !== self).map(c => c.target)),
@@ -223,7 +224,7 @@ async function buildNowSnapshot(cwd: string, flags: Record<string, string>): Pro
       // null, not 0, when the ledger could not be read. The text renderer
       // already printed "unknown" here; JSON was still stating zero as fact,
       // so a consumer reading `completed` reproduced the reported symptom.
-      completed: ledgerError ? null : current.tickets.filter(t => completedTickets.has(t.key)).length,
+      completed: ledgerError ? null : current.tickets.filter(t => isTicketComplete(t, completedTickets)).length,
       status: next.reason,
     } : undefined,
     ledgerError,

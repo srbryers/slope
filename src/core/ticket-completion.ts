@@ -167,9 +167,22 @@ export async function readCompletedTicketKeys(
   return new Set((await readTicketCompletions(store, sprint)).keys());
 }
 
+/** A bare key, or a roadmap ticket whose authored `status` is also read. */
+export type NextTicketCandidate = string | { key: string; status?: unknown };
+
+/**
+ * Done if the ledger records it, or the roadmap source marks it
+ * `status: complete`. Tickets closed by hand in the source have no ticket-done
+ * event, and `slope now` kept recommending them (#741).
+ */
+export function isTicketComplete(ticket: NextTicketCandidate, completed: ReadonlySet<string>): boolean {
+  if (typeof ticket === 'string') return completed.has(ticket);
+  return ticket.status === 'complete' || completed.has(ticket.key);
+}
+
 export interface NextTicketInput {
-  /** Ticket keys in roadmap order. */
-  tickets: readonly string[];
+  /** Tickets in roadmap order. */
+  tickets: readonly NextTicketCandidate[];
   /** Keys with a recorded completion. */
   completed: ReadonlySet<string>;
   /** Keys claimed by the asking actor. Their own work in flight. */
@@ -210,7 +223,10 @@ export interface NextTicketResult {
  *     through would be wrong.
  */
 export function selectNextTicket(input: NextTicketInput): NextTicketResult {
-  const { tickets, completed } = input;
+  const tickets = input.tickets.map(t => (typeof t === 'string' ? t : t.key));
+  const completed = new Set(input.tickets
+    .filter(t => isTicketComplete(t, input.completed))
+    .map(t => (typeof t === 'string' ? t : t.key)));
   const self = input.claimedBySelf ?? new Set<string>();
   const others = input.claimedByOthers ?? new Set<string>();
   if (tickets.length === 0) return { reason: 'no_tickets' };

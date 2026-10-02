@@ -803,10 +803,12 @@ export {
   readTicketCompletions,
   readCompletedTicketKeys,
   readCompletedTicketKeysOrEmpty,
+  isTicketComplete,
   selectNextTicket,
 } from './ticket-completion.js';
 export type {
   TicketCompletion,
+  NextTicketCandidate,
   NextTicketInput,
   NextTicketReason,
   NextTicketResult,
