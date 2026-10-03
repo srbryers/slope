@@ -457,6 +457,32 @@ describe('slope roadmap status', () => {
     expect(output).not.toContain('Work S7-1');
   });
 
+  it('skips source-completed tickets in the current sprint recommendation', () => {
+    const roadmap = makeRoadmapJson();
+    roadmap.sprints[0].tickets[0].status = 'complete';
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir);
+
+    roadmapCommand(['status', '--sprint=7']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Work S7-2: T2');
+    expect(output).not.toContain('Work S7-1');
+  });
+
+  it('recommends closeout when every current-sprint ticket is source-completed', () => {
+    const roadmap = makeRoadmapJson();
+    roadmap.sprints[0].tickets.forEach(ticket => { ticket.status = 'complete'; });
+    writeRoadmap(tmpDir, roadmap);
+    writeConfig(tmpDir);
+
+    roadmapCommand(['status', '--sprint=7']);
+
+    const output = consoleOutput.join('\n');
+    expect(output).toContain('Review S7 and prepare closeout.');
+    expect(output).not.toMatch(/Work S7-/);
+  });
+
   it('marks completed sprints from scorecards', () => {
     writeRoadmap(tmpDir, makeRoadmapJson());
     writeConfig(tmpDir, { currentSprint: 8, scorecardDir: 'docs/retros', scorecardPattern: 'sprint-*.json', minSprint: 1 });

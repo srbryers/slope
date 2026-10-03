@@ -1054,8 +1054,12 @@ function printCompactRoadmapStatus(
   if (realityLines.some(line => line.includes('[error]'))) {
     console.log('  Resolve the first roadmap reality error before advancing the lane.');
   } else if (currentIsPending && current?.tickets?.length) {
-    const first = current.tickets[0];
-    console.log(`  Work ${first.key}: ${first.title}`);
+    const nextTicket = current.tickets.find(ticket => ticket.status !== 'complete');
+    if (nextTicket) {
+      console.log(`  Work ${nextTicket.key}: ${nextTicket.title}`);
+    } else {
+      console.log(`  Review ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))} and prepare closeout.`);
+    }
   } else if (nextReady) {
     console.log(`  Start ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, nextReady))}: ${nextReady.theme || 'Untitled Sprint'}`);
   } else {

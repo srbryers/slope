@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { nowCommand } from '../../../src/cli/commands/now.js';
@@ -108,6 +108,37 @@ describe('slope now', () => {
     expect(parsed.sprint).toBe('151');
     expect(parsed.roadmap.theme).toBe('Skill-First Human Cockpit');
     expect(parsed.nextTicket.key).toBe('S151-1');
+  });
+
+  it('skips source-completed tickets while preserving unfinished claim priority', async () => {
+    const roadmapPath = join(tmpDir, 'docs', 'backlog', 'roadmap.json');
+    const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8')) as RoadmapDefinition;
+    roadmap.sprints[1].tickets[0].status = 'complete';
+    writeFileSync(roadmapPath, JSON.stringify(roadmap, null, 2));
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    await store.claim({ sprint_number: 151, player: 'test', target: 'S151-1', scope: 'ticket' });
+    store.close();
+
+    const output = await captureLog(() => nowCommand(['--json']));
+    const parsed = JSON.parse(output);
+
+    expect(parsed.nextTicket.key).toBe('S151-2');
+  });
+
+  it('returns no next ticket when every ticket is source-completed, even with a lingering claim', async () => {
+    const roadmapPath = join(tmpDir, 'docs', 'backlog', 'roadmap.json');
+    const roadmap = JSON.parse(readFileSync(roadmapPath, 'utf8')) as RoadmapDefinition;
+    roadmap.sprints[1].tickets.forEach(ticket => { ticket.status = 'complete'; });
+    writeFileSync(roadmapPath, JSON.stringify(roadmap, null, 2));
+    const store = createStore({ storePath: '.slope/slope.db', cwd: tmpDir });
+    await store.claim({ sprint_number: 151, player: 'test', target: 'S151-1', scope: 'ticket' });
+    store.close();
+
+    const output = await captureLog(() => nowCommand(['--json']));
+    const parsed = JSON.parse(output);
+
+    expect(parsed.nextTicket).toBeUndefined();
+    expect(parsed.nextAction).toContain('prepare closeout');
   });
 
   it('surfaces an explicit required-review waiver ahead of ordinary next-ticket guidance', async () => {

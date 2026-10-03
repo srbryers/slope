@@ -89,7 +89,8 @@ function formatPhaseProgress(roadmap: RoadmapDefinition, sprint: SprintId, compl
 function findNextTicket(sprint: RoadmapSprint | undefined, claims: SprintClaim[]): RoadmapTicket | undefined {
   if (!sprint) return undefined;
   const claimedTargets = new Set(claims.map(c => c.target));
-  return sprint.tickets.find(ticket => !claimedTargets.has(ticket.key)) ?? sprint.tickets[0];
+  const unfinished = sprint.tickets.filter(ticket => ticket.status !== 'complete');
+  return unfinished.find(ticket => !claimedTargets.has(ticket.key)) ?? unfinished[0];
 }
 
 function buildNextAction(snapshot: Omit<NowSnapshot, 'nextAction'>): string {

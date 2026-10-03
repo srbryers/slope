@@ -26,6 +26,8 @@ export interface RoadmapTicket {
   title: string;
   club: RoadmapClub;
   complexity: RoadmapTicketComplexity;
+  /** Optional source-authored completion state for ticket-level planning. */
+  status?: string;
   depends_on?: string[]; // ticket keys (intra-sprint or cross-sprint)
   /** New tickets use one issue; legacy history may retain multiple issue links. */
   github_issue?: number | number[];
