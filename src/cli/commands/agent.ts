@@ -229,7 +229,7 @@ export async function collectAgentStatus(cwd: string, actorOverride?: string): P
       // agents at the ticket the first one held, and it preferred a claimed
       // ticket even when the ledger already recorded it done (#697).
       const result = selectNextTicket({
-        tickets: sprint.tickets.map(t => t.key),
+        tickets: sprint.tickets,
         completed: completedTickets,
         claimedBySelf: selfClaims,
         claimedByOthers: otherClaims,

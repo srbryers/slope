@@ -31,7 +31,14 @@ function trySlope(cwd: string, args: string[]): { status: number | null; stdout:
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 
-function setupRepo(): string {
+type FixtureTicket = { key: string; title: string; club: string; complexity: string; status?: string };
+
+const DEFAULT_TICKETS: FixtureTicket[] = [
+  { key: 'S1-1', title: 'first', club: 'wedge', complexity: 'small' },
+  { key: 'S1-2', title: 'second', club: 'wedge', complexity: 'small' },
+];
+
+function setupRepo(tickets: FixtureTicket[] = DEFAULT_TICKETS): string {
   const dir = mkdtempSync(join(tmpdir(), 'slope-completion-'));
   mkdirSync(join(dir, '.slope'), { recursive: true });
   mkdirSync(join(dir, 'docs', 'backlog'), { recursive: true });
@@ -51,10 +58,7 @@ function setupRepo(): string {
         par: 4,
         slope: 1,
         type: 'bugfix',
-        tickets: [
-          { key: 'S1-1', title: 'first', club: 'wedge', complexity: 'small' },
-          { key: 'S1-2', title: 'second', club: 'wedge', complexity: 'small' },
-        ],
+        tickets,
       },
       // A second sprint so state can legitimately advance. The rollover guard
       // refuses to start a sprint the roadmap does not contain, which is the
@@ -134,7 +138,7 @@ describe('completion truth across surfaces (#697)', () => {
 
       const out = runSlope(cwd, ['roadmap', 'status']);
 
-      expect(out).toContain('All 2 tickets recorded done');
+      expect(out).toContain('All 2 tickets complete');
       expect(out).not.toMatch(/Work S1-[12]/);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -249,7 +253,7 @@ describe('completion truth with a live claim (#697)', () => {
       expect(now.tickets.status).toBe('all_claimed');
       expect(now.nextAction).toContain('claimed by someone else');
       expect(status).toContain('claimed by someone else');
-      expect(status).not.toContain('recorded done. Close out');
+      expect(status).not.toContain('tickets complete. Close out');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -309,6 +313,98 @@ describe('completion truth with a live claim (#697)', () => {
       // A read-only report was running a full schema migration in repos that
       // had never opened a store.
       expect(existsSync(db)).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('tickets the roadmap source marks complete (#741)', () => {
+  beforeAll(() => {
+    if (!existsSync(SLOPE_BIN)) {
+      throw new Error(`dist not built — run \`pnpm build\` first. Expected ${SLOPE_BIN}`);
+    }
+  });
+
+  const ticket = (key: string, title: string, status?: string): FixtureTicket =>
+    ({ key, title, club: 'wedge', complexity: 'small', ...(status ? { status } : {}) });
+
+  it('skips a ticket marked complete in the source with no ticket-done event', () => {
+    const cwd = setupRepo([ticket('S1-1', 'first', 'complete'), ticket('S1-2', 'second')]);
+    try {
+      // No `ticket done` ran, so the ledger is empty. Only the source status
+      // says S1-1 is finished, and `slope now` used to recommend it anyway.
+      const now = JSON.parse(runSlope(cwd, ['now', '--json']));
+      const agent = JSON.parse(runSlope(cwd, ['agent', 'status', '--json']));
+      const status = runSlope(cwd, ['roadmap', 'status']);
+
+      expect(now.nextTicket.key).toBe('S1-2');
+      expect(now.tickets).toMatchObject({ total: 2, completed: 1 });
+      expect(agent.nextTicket).toBe('S1-2');
+      expect(agent.nextTicketReason).toBe('available');
+      expect(status).toContain('S1-1: first [done]');
+      expect(status).toContain('Work S1-2: second');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('reports all complete, not in flight, when a claim is left on a completed ticket', () => {
+    const cwd = setupRepo([ticket('S1-1', 'first', 'complete'), ticket('S1-2', 'second', 'complete')]);
+    try {
+      // An own claim that was never released. Resuming it would send the
+      // agent back into finished work.
+      runSlope(cwd, ['claim', '--sprint=1', '--target=S1-1']);
+
+      const now = JSON.parse(runSlope(cwd, ['now', '--json']));
+      const agent = JSON.parse(runSlope(cwd, ['agent', 'status', '--json']));
+      const status = runSlope(cwd, ['roadmap', 'status']);
+
+      expect(now.nextTicket).toBeNull();
+      expect(now.tickets.status).toBe('all_complete');
+      expect(now.tickets.completed).toBe(2);
+      expect(agent.nextTicket).toBeNull();
+      expect(agent.nextTicketReason).toBe('all_complete');
+      expect(status).toContain('All 2 tickets complete');
+      expect(status).not.toContain('recorded done');
+      expect(status).not.toMatch(/(Work|Continue) S1-/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps own-claim precedence and all_claimed for the unfinished tickets', () => {
+    const cwd = setupRepo([
+      ticket('S1-1', 'first', 'complete'),
+      ticket('S1-2', 'second'),
+      ticket('S1-3', 'third'),
+    ]);
+    try {
+      // agent-a holds the completed S1-1 and the unfinished S1-3; agent-b
+      // holds S1-2. agent-a must resume S1-3, never the finished S1-1.
+      runSlope(cwd, ['claim', '--sprint=1', '--target=S1-1', '--actor=agent-a']);
+      runSlope(cwd, ['claim', '--sprint=1', '--target=S1-3', '--actor=agent-a']);
+      runSlope(cwd, ['claim', '--sprint=1', '--target=S1-2', '--actor=agent-b']);
+
+      const nowA = JSON.parse(runSlope(cwd, ['now', '--json', '--actor=agent-a']));
+      const agentA = JSON.parse(runSlope(cwd, ['agent', 'status', '--json', '--actor=agent-a']));
+      const statusA = runSlope(cwd, ['roadmap', 'status', '--actor=agent-a']);
+      expect(nowA.nextTicket.key).toBe('S1-3');
+      expect(nowA.tickets.status).toBe('in_flight');
+      expect(agentA.nextTicket).toBe('S1-3');
+      expect(agentA.nextTicketReason).toBe('in_flight');
+      expect(statusA).toContain('Continue S1-3: third');
+
+      // A third actor sees both unfinished tickets held by others. The
+      // completed S1-1 is not counted as remaining work.
+      const nowC = JSON.parse(runSlope(cwd, ['now', '--json', '--actor=agent-c']));
+      const agentC = JSON.parse(runSlope(cwd, ['agent', 'status', '--json', '--actor=agent-c']));
+      const statusC = runSlope(cwd, ['roadmap', 'status', '--actor=agent-c']);
+      expect(nowC.nextTicket).toBeNull();
+      expect(nowC.tickets.status).toBe('all_claimed');
+      expect(nowC.tickets.completed).toBe(1);
+      expect(agentC.nextTicketReason).toBe('all_claimed');
+      expect(statusC).toContain('claimed by someone else');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
