@@ -138,7 +138,7 @@ describe('completion truth across surfaces (#697)', () => {
 
       const out = runSlope(cwd, ['roadmap', 'status']);
 
-      expect(out).toContain('All 2 tickets recorded done');
+      expect(out).toContain('All 2 tickets complete');
       expect(out).not.toMatch(/Work S1-[12]/);
     } finally {
       rmSync(cwd, { recursive: true, force: true });
@@ -253,7 +253,7 @@ describe('completion truth with a live claim (#697)', () => {
       expect(now.tickets.status).toBe('all_claimed');
       expect(now.nextAction).toContain('claimed by someone else');
       expect(status).toContain('claimed by someone else');
-      expect(status).not.toContain('recorded done. Close out');
+      expect(status).not.toContain('tickets complete. Close out');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -365,7 +365,8 @@ describe('tickets the roadmap source marks complete (#741)', () => {
       expect(now.tickets.completed).toBe(2);
       expect(agent.nextTicket).toBeNull();
       expect(agent.nextTicketReason).toBe('all_complete');
-      expect(status).toContain('All 2 tickets recorded done');
+      expect(status).toContain('All 2 tickets complete');
+      expect(status).not.toContain('recorded done');
       expect(status).not.toMatch(/(Work|Continue) S1-/);
     } finally {
       rmSync(cwd, { recursive: true, force: true });

@@ -1188,7 +1188,7 @@ function printCompactRoadmapStatus(
   } else if (currentIsPending && current?.tickets?.length) {
     // Every ticket has a recorded completion. Recommending tickets[0] here is
     // what made `ticket done` look like it had not registered (#697).
-    console.log(`  All ${current.tickets.length} tickets recorded done. Close out ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))}.`);
+    console.log(`  All ${current.tickets.length} tickets complete. Close out ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, current))}.`);
   } else if (nextReady) {
     console.log(`  Start ${formatRoadmapSprintLabel(roadmap, roadmapSprintKey(roadmap, nextReady))}: ${nextReady.theme || 'Untitled Sprint'}`);
   } else {
