@@ -9,6 +9,8 @@ import {
   aggregateStandups,
   formatTeamStandup,
   sprintIdKey,
+  TICKET_DONE_KIND,
+  readCompletedTicketKeysOrEmpty,
 } from '../../core/index.js';
 import type { SlopeEvent, SprintClaim, SprintId, StandupContext, StandupReport } from '../../core/index.js';
 import { readTranscript } from '../../core/transcript.js';
@@ -212,6 +214,20 @@ export async function standupCommand(args: string[]): Promise<void> {
       const sprint = sprintNumber ?? config.currentSprint ?? '1';
       const claims = await store.getActiveClaims(sprint);
 
+      // `slope ticket done` writes kind=ticket_done with no session_id, so
+      // session events never contain the completion ledger. Fold those
+      // sprint records in so generateStandup can render key + commit (#714).
+      const sprintEvents = await store.getEventsBySprint(sprint);
+      const seen = new Set(events.map(e => e.id));
+      for (const event of sprintEvents) {
+        if (seen.has(event.id)) continue;
+        if (event.type === 'decision' && event.data.kind === TICKET_DONE_KIND) {
+          events.push(event);
+          seen.add(event.id);
+        }
+      }
+      const ledger = await readCompletedTicketKeysOrEmpty(store, sprint);
+
       // Find agent_role from session
       const sessions = await store.getActiveSessions();
       const session = sessions.find(s => s.session_id === sessionId);
@@ -223,6 +239,7 @@ export async function standupCommand(args: string[]): Promise<void> {
         events,
         claims,
         context: gatherStandupContext(cwd, config, sessionId, sprintNumber, session?.started_at),
+        completedTicketKeys: ledger.keys,
       });
 
       // Store standup as event

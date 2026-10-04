@@ -9,10 +9,15 @@ import {
 } from '../../src/core/standup.js';
 import type { StandupReport, HandoffEntry, TeamStandup } from '../../src/core/standup.js';
 import type { SlopeEvent, SprintClaim } from '../../src/core/types.js';
+import { TICKET_DONE_KIND } from '../../src/core/ticket-completion.js';
 
 // --- Helpers ---
 
-function makeEvent(type: SlopeEvent['type'], data: Record<string, unknown> = {}): SlopeEvent {
+function makeEvent(
+  type: SlopeEvent['type'],
+  data: Record<string, unknown> = {},
+  ticketKey?: string,
+): SlopeEvent {
   return {
     id: `evt-${Math.random().toString(36).slice(2)}`,
     session_id: 'sess-1',
@@ -20,6 +25,7 @@ function makeEvent(type: SlopeEvent['type'], data: Record<string, unknown> = {})
     timestamp: new Date().toISOString(),
     data,
     sprint_number: 14,
+    ...(ticketKey ? { ticket_key: ticketKey } : {}),
   };
 }
 
@@ -151,6 +157,96 @@ describe('generateStandup', () => {
     });
 
     expect(report.ticketKey).toBe('S14-1');
+  });
+
+  // #714 — `slope ticket done` writes decision events with kind=ticket_done
+  // and neither `choice` nor `description`. The generic fallback then prints
+  // the literal "Decision made" for every completion, and hasCompletion looks
+  // at `data.status`, which those records never set.
+  it('renders ticket_done records as ticket key plus commit, not Decision made (#714)', () => {
+    const report = generateStandup({
+      sessionId: 'sess-1',
+      events: [
+        makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'abc1234' }, 'S14-1'),
+        makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'def5678' }, 'S14-2'),
+        makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'aaa1111' }, 'S14-3'),
+        makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'bbb2222' }, 'S14-4'),
+        makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'ccc3333' }, 'S14-5'),
+      ],
+      claims: [],
+    });
+
+    expect(report.decisions).toHaveLength(5);
+    expect(report.decisions).not.toContain('Decision made');
+    expect(report.decisions).toEqual([
+      'S14-1 @ abc1234',
+      'S14-2 @ def5678',
+      'S14-3 @ aaa1111',
+      'S14-4 @ bbb2222',
+      'S14-5 @ ccc3333',
+    ]);
+  });
+
+  it('renders a repaired ticket_done as its own key plus the corrected commit (#714)', () => {
+    const report = generateStandup({
+      sessionId: 'sess-1',
+      events: [
+        makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'oldsha' }, 'S14-1'),
+        makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'newsha', repaired: true }, 'S14-1'),
+      ],
+      claims: [],
+    });
+
+    expect(report.decisions).not.toContain('Decision made');
+    expect(report.decisions).toContain('S14-1 @ oldsha');
+    expect(report.decisions).toContain('S14-1 @ newsha');
+  });
+
+  it('renders a ticket_done without a commit as the ticket key (#714)', () => {
+    const report = generateStandup({
+      sessionId: 'sess-1',
+      events: [makeEvent('decision', { kind: TICKET_DONE_KIND, player: 'alice' }, 'S14-1')],
+      claims: [],
+    });
+
+    expect(report.decisions).toEqual(['S14-1']);
+    expect(report.decisions).not.toContain('Decision made');
+  });
+
+  it('leaves ordinary decision events on the choice/description path (#714)', () => {
+    const report = generateStandup({
+      sessionId: 'sess-1',
+      events: [
+        makeEvent('decision', { choice: 'Use SQLite' }),
+        makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'abc1234' }, 'S14-1'),
+        makeEvent('decision', { description: 'Skip caching' }),
+      ],
+      claims: [],
+    });
+
+    expect(report.decisions).toEqual(['Use SQLite', 'S14-1 @ abc1234', 'Skip caching']);
+  });
+
+  it('status is complete when ticket_done records exist (#714)', () => {
+    const report = generateStandup({
+      sessionId: 'sess-1',
+      events: [makeEvent('decision', { kind: TICKET_DONE_KIND, commit: 'abc1234' }, 'S14-1')],
+      claims: [],
+    });
+
+    expect(report.status).toBe('complete');
+  });
+
+  it('status is complete when the ledger reports completed ticket keys (#714)', () => {
+    const report = generateStandup({
+      sessionId: 'sess-1',
+      events: [makeEvent('decision', { choice: 'Use SQLite' })],
+      claims: [],
+      completedTicketKeys: new Set(['S14-1']),
+    });
+
+    expect(report.status).toBe('complete');
+    expect(report.decisions).toEqual(['Use SQLite']);
   });
 });
 
