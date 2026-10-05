@@ -153,8 +153,9 @@ describe('#748 sprint evidence belongs to the checkout the command runs in', () 
       expect(sprintStatePath(wt)).toBe(join(wt, SPRINT_STATE));
       const result = await sprintCompletionGuard(prCreate(PR, wt), wt);
 
+      // No decision and no context: the primary's file is never consulted.
       expect(result).toEqual({});
-      expect(JSON.stringify(result)).not.toContain(sharedPath);
+      expect(sharedPath).not.toBe(sprintStatePath(wt));
     });
 
     it('still enforces shared (ignored) operational state held by the primary', async () => {

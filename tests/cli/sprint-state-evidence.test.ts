@@ -142,7 +142,15 @@ describe('persistence refuses null gates (#744)', () => {
     const bad = activeState('70') as any;
     bad.gates.tests = null;
 
-    expect(() => saveSprintState(root, bad)).toThrow(new RegExp(`${path}.*gates\\.tests.*true or false`));
+    // Substring checks, not a RegExp built from `path`: Windows paths contain backslashes.
+    let message = '';
+    try {
+      saveSprintState(root, bad);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain(path);
+    expect(message).toContain('`gates.tests` must be true or false');
 
     expect(readFileSync(path, 'utf8')).toBe(before);
   });
