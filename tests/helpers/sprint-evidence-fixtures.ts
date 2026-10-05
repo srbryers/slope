@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { makeTempDir } from './temp-dir.js';
 import { createSprintState, type SprintState } from '../../src/cli/sprint-state.js';
 
 const created: string[] = [];
@@ -14,8 +14,9 @@ export function cleanupFixtures(): void {
   for (const dir of created.splice(0)) rmSync(dir, { recursive: true, force: true });
 }
 
+/** Canonical temp dir via the shared helper (8.3 short names, /var symlink; #712, #725). */
 export function tempDir(prefix: string): string {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  const dir = makeTempDir(prefix);
   created.push(dir);
   return dir;
 }

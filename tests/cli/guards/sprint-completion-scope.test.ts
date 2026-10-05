@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, rmSync } from 'node:fs';
+import { isAbsolute, join } from 'node:path';
 import { sprintCompletionGuard } from '../../../src/cli/guards/sprint-completion.js';
-import { loadSprintStateResult } from '../../../src/cli/sprint-state.js';
+import { loadSprintState, loadSprintStateResult, sprintStatePath } from '../../../src/cli/sprint-state.js';
 import type { HookInput } from '../../../src/core/index.js';
 import {
   PRELUDE_DRAFT,
@@ -135,6 +135,28 @@ describe('#748 sprint evidence belongs to the checkout the command runs in', () 
       expect(result).toEqual({});
     });
 
+    it('does not fall back to the primary when this branch tracks the file but it is deleted from the working tree', async () => {
+      const primary = initRepo();
+      writeConfig(primary);
+      writeState(primary, completeState('64.6'));
+      const base = commitAll(primary, 'branch tracks its evidence');
+      // The primary moves on to ignored, shared state that is still in progress.
+      git(primary, ['rm', '-r', '--cached', '-q', '.slope']);
+      writeFile(primary, '.gitignore', '.slope/\n');
+      git(primary, ['add', '.gitignore']);
+      git(primary, ['commit', '-q', '-m', 'untrack .slope']);
+      expect(git(primary, ['ls-files', '.slope'])).toBe('');
+      const sharedPath = writeState(primary, activeState('70'));
+      const wt = addWorktree(primary, 'feat/deleted-evidence', base);
+      rmSync(join(wt, SPRINT_STATE));
+
+      expect(sprintStatePath(wt)).toBe(join(wt, SPRINT_STATE));
+      const result = await sprintCompletionGuard(prCreate(PR, wt), wt);
+
+      expect(result).toEqual({});
+      expect(JSON.stringify(result)).not.toContain(sharedPath);
+    });
+
     it('still enforces shared (ignored) operational state held by the primary', async () => {
       const primary = initRepo();
       writeFile(primary, '.gitignore', '.slope/\n');
@@ -195,6 +217,52 @@ describe('#748 sprint evidence belongs to the checkout the command runs in', () 
         expect(result.context, command).toContain('not enforced');
         expect(result.context, command).toContain('other/thing');
         expect(result.context, command).toContain(root);
+      }
+    });
+
+    it('reads --repo between `pr` and `create`, and -R=value, as the target repository', async () => {
+      const root = sessionRepo('https://github.com/acme/app.git');
+
+      for (const command of [
+        'gh pr --repo other/thing create --title x',
+        'gh pr -R other/thing create --title x',
+        'gh pr create -R=other/thing --title x',
+      ]) {
+        const result = await sprintCompletionGuard(prCreate(command, root), root);
+        expect(result.decision, command).toBeUndefined();
+        expect(result.context, command).toContain('not enforced');
+        expect(result.context, command).toContain('targets other/thing,');
+      }
+      for (const command of [
+        'gh pr --repo acme/app create --title x',
+        'gh pr -R acme/app create --title x',
+        'gh pr create -R=acme/app --title x',
+        'gh pr create -R=ACME/app --title x',
+      ]) {
+        const result = await sprintCompletionGuard(prCreate(command, root), root);
+        expect(result.decision, command).toBe('deny');
+      }
+    });
+
+    it('judges every gh pr create in the invocation, not only the first', async () => {
+      const bad = sessionRepo('https://github.com/acme/app.git');
+      const clean = initRepo('slope-clean-');
+      writeConfig(clean);
+      writeScorecard(clean, '64.6');
+      writeState(clean, completeState('64.6'));
+      commitAll(clean, 'clean evidence');
+
+      const cases = [
+        // the first is aimed elsewhere; the second runs against the bad evidence
+        [`gh pr create -R other/thing --title a && gh pr create --title b`, bad],
+        [`gh pr create --repo other/thing --title a; gh pr create --repo acme/app --title b`, bad],
+        // the first is fine; a later cd lands on the bad checkout
+        [`cd "${clean}" && gh pr create --title a && cd "${bad}" && gh pr create --title b`, clean],
+      ] as const;
+      for (const [command, session] of cases) {
+        const result = await sprintCompletionGuard(prCreate(command, session), session);
+        expect(result.decision, command).toBe('deny');
+        expect(result.blockReason, command).toContain(join(bad, SPRINT_STATE));
       }
     });
 
@@ -270,6 +338,34 @@ describe('#744 planned drafts are "no sprint in progress"; real corruption still
     }
   });
 
+  it('the strict and lenient loaders agree that a planned draft is no sprint', async () => {
+    const root = initRepo();
+    writeConfig(root);
+    const allFalse = { tests: false, code_review: false, architect_review: false, scorecard: false, review_md: false };
+
+    // A numeric sprint id with boolean gates is what the lenient loader used to accept as active.
+    for (const draft of [
+      PRELUDE_DRAFT,
+      { ...PRELUDE_DRAFT, gates: allFalse },
+      { ...PRELUDE_DRAFT, sprint: '12', gates: allFalse },
+      { ...PRELUDE_DRAFT, sprint: 12, gates: { ...allFalse, tests: null } },
+    ]) {
+      const path = writeState(root, draft);
+      const before = readFileSync(path, 'utf8');
+
+      expect(loadSprintStateResult(root).status).toBe('draft');
+      // loadSprintState is what the Stop and PostToolUse paths use.
+      expect(loadSprintState(root)).toBeNull();
+
+      // A passing test run must not mark a gate on, or rewrite, a draft.
+      await sprintCompletionGuard({
+        session_id: 's', cwd: root, hook_event_name: 'PostToolUse', tool_name: 'Bash',
+        tool_input: { command: 'npx vitest' }, tool_response: { exit_code: 0 },
+      }, root);
+      expect(readFileSync(path, 'utf8')).toBe(before);
+    }
+  });
+
   it.each<[string, Record<string, unknown> | string]>([
     ['an active phase with a null gate', nullGateActiveState()],
     ['an active phase with every gate false but a null review gate', { ...activeState('74'), gates: { tests: false, code_review: null, architect_review: false, scorecard: false, review_md: false } }],
@@ -307,7 +403,7 @@ describe('#742 every denial names the file, the field and a repair', () => {
 
     expect(result.decision).toBe('deny');
     const reason = result.blockReason!;
-    expect(path.startsWith('/')).toBe(true);
+    expect(isAbsolute(path)).toBe(true);
     expect(reason).toContain(`Sprint evidence file: ${path}`);
     expect(reason).toContain('`gates.tests` must be true or false (found null)');
     expect(reason).toContain(`Edit ${path} and set \`gates.tests\` to \`false\``);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   findSprintStateProblem,
@@ -24,6 +24,7 @@ import {
   cleanupFixtures,
   commitAll,
   completeState,
+  git,
   initRepo,
   nullGateActiveState,
   writeConfig,
@@ -221,6 +222,43 @@ describe('sprintStatePath policy (#748)', () => {
     saveSprintState(wt, activeState('71'));
     expect(JSON.parse(readFileSync(join(wt, SPRINT_STATE), 'utf8')).sprint).toBe('71');
     expect(JSON.parse(readFileSync(join(primary, SPRINT_STATE), 'utf8')).sprint).toBe('70');
+  });
+
+  it('keeps ownership with a tracked file that is deleted from disk, for reads and writes', () => {
+    const primary = initRepo();
+    writeConfig(primary);
+    writeState(primary, completeState('64.6'));
+    const base = commitAll(primary, 'branch tracks its evidence');
+    git(primary, ['rm', '-r', '--cached', '-q', '.slope']);
+    writeFile(primary, '.gitignore', '.slope/\n');
+    git(primary, ['add', '.gitignore']);
+    git(primary, ['commit', '-q', '-m', 'untrack .slope']);
+    const sharedPath = writeState(primary, activeState('71'));
+    const wt = addWorktree(primary, 'feat/deleted', base);
+    rmSync(join(wt, SPRINT_STATE));
+    const before = readFileSync(sharedPath, 'utf8');
+
+    expect(sprintStatePath(wt)).toBe(join(wt, SPRINT_STATE));
+    expect(loadSprintStateResult(wt).status).toBe('missing');
+
+    saveSprintState(wt, activeState('70'));
+
+    expect(JSON.parse(readFileSync(join(wt, SPRINT_STATE), 'utf8')).sprint).toBe('70');
+    expect(readFileSync(sharedPath, 'utf8')).toBe(before);
+  });
+
+  it('does not borrow a primary file that is tracked but deleted from its disk', () => {
+    const primary = initRepo();
+    writeConfig(primary);
+    const base = commitAll(primary, 'config only');
+    const primaryPath = writeState(primary, activeState('71'));
+    commitAll(primary, 'primary tracks evidence');
+    rmSync(primaryPath);
+    const wt = addWorktree(primary, 'feat/none', base);
+
+    expect(sprintStatePath(wt)).toBe(join(wt, SPRINT_STATE));
+    saveSprintState(wt, activeState('70'));
+    expect(JSON.parse(readFileSync(join(wt, SPRINT_STATE), 'utf8')).sprint).toBe('70');
   });
 
   it('does not move sessions or claims: only sprint-state resolution changed', () => {
