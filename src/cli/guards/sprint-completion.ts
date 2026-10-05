@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
@@ -14,7 +14,19 @@ import {
 import { loadConfig } from '../config.js';
 import { shellCommandSegments, commandMatches, type ParsedCommand } from './command-parse.js';
 import { loadPrReviewState } from '../pr-review-state.js';
-import { loadSprintState, loadSprintStateResult, mutateSprintState, updateGate, isSprintComplete, pendingGates } from '../sprint-state.js';
+import {
+  formatSprintStateDiagnosis,
+  gateCompletionCommand,
+  isSprintComplete,
+  loadSprintState,
+  loadSprintStateResult,
+  mutateSprintState,
+  pendingGateNames,
+  pendingGates,
+  sprintStatePath,
+  updateGate,
+} from '../sprint-state.js';
+import { resolveRepoSourceCwd } from '../../core/repo-state-scope.js';
 import { inspectSprintRollover, verifySprintRolloverLineage } from '../sprint-rollover.js';
 import { inferSprintFromBranch } from '../workflow-resync.js';
 
@@ -65,17 +77,38 @@ function checkStaleness(sprint: SprintId, cwd: string): string | null {
 function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   const commandContext = prCreateCommandContext(input, cwd);
   if (!commandContext) return {};
-  const guardCwd = commandContext.cwd;
+
+  // Everything below describes the checkout the command actually runs in: its
+  // sprint evidence, its scorecards, its branch. Never the session's cwd.
+  const guardCwd = resolveRepoSourceCwd(commandContext.cwd);
+
+  // `--repo` can aim the PR at a repository this checkout is not a clone of.
+  // Its sprint evidence lives in that repository's checkout, which we cannot
+  // identify from here, and reading this checkout's file instead would apply
+  // an unrelated repository's gates. So: no enforcement, and say why.
+  if (commandContext.repo && !checkoutHasRemote(guardCwd, commandContext.repo)) {
+    return {
+      context: [
+        `SLOPE sprint-completion: not enforced. \`gh pr create\` targets ${commandContext.repo}, which is not a remote of the checkout at ${guardCwd}.`,
+        'Sprint gates are read from the target repository\'s own checkout; run the command from that checkout to apply them.',
+      ].join(' '),
+    };
+  }
 
   const loadedState = loadSprintStateResult(guardCwd);
-  if (loadedState.status === 'missing') return {};
+  // Missing, or a planned draft with nothing started: no sprint in progress.
+  if (loadedState.status === 'missing' || loadedState.status === 'draft') return {};
   if (loadedState.status === 'corrupt') {
     return {
       decision: 'deny',
-      blockReason: 'SLOPE sprint-completion: corrupt sprint evidence was preserved; repair it before creating a PR.',
+      blockReason: [
+        'SLOPE sprint-completion: corrupt sprint evidence was preserved; repair it before creating a PR.',
+        ...formatSprintStateDiagnosis(loadedState.diagnosis),
+      ].join('\n'),
     };
   }
   const state = loadedState.state;
+  const evidenceFile = sprintStatePath(guardCwd);
   // Collected rather than returned immediately: a branch can be missing the
   // lineage audit *and* the scorecard, and reporting one at a time cost a round
   // trip each with differently-worded refusals (GH #641).
@@ -110,7 +143,8 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
       decision: 'deny',
       blockReason: [
         'SLOPE sprint-completion: branch and sprint-state disagree; refusing automatic rebind.',
-        `State: Sprint ${formatSprintNumber(state.sprint)}; branch suggests Sprint ${branchSprint}.`,
+        `Sprint evidence file: ${evidenceFile}`,
+        `State: Sprint ${formatSprintNumber(state.sprint)} (\`sprint\`); branch suggests Sprint ${branchSprint}.`,
         ...recovery,
       ].join('\n'),
     };
@@ -122,11 +156,13 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   if (gatesComplete && !scorecardMissing && !lineageError) return {};
 
   const staleWarning = checkStaleness(state.sprint, guardCwd);
-  const lines: string[] = [];
+  // Every denial below names the evidence file it judged, so the operator can
+  // open the same file the guard read (#742).
+  const lines: string[] = [`Sprint evidence file: ${evidenceFile}`, ''];
 
   if (lineageError) {
     lines.push(
-      `SLOPE sprint-completion: rollover lineage verification failed: ${lineageError}`,
+      `SLOPE sprint-completion: rollover lineage verification failed (\`rollover\`): ${lineageError}`,
       '',
       'The rollover audit must be present on the branch being PR\'d, not only',
       'elsewhere in a branch stack. Record it with `slope sprint rollover`, or',
@@ -135,9 +171,10 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   }
 
   if (scorecardMissing) {
-    if (lines.length > 0) lines.push('');
+    if (lines.length > 2) lines.push('');
     lines.push(
       `SLOPE sprint-completion: Cannot create PR — Sprint ${state.sprint} scorecard not found.`,
+      `Expected at: ${scorecardPath(state.sprint, guardCwd)}`,
       '',
       'Create a scorecard and validate it:',
       '  - `slope auto-card` — generate from git + CI signals',
@@ -146,13 +183,15 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   }
 
   if (!gatesComplete) {
+    const pendingNames = pendingGateNames(state);
     const pending = pendingGates(state);
-    if (lines.length > 0) lines.push('');
+    if (lines.length > 2) lines.push('');
     lines.push(
       `SLOPE sprint-completion: Sprint ${state.sprint} has incomplete gates:`,
-      ...pending.map(g => `  - ${g}`),
+      ...pending.map((label, index) => `  - ${label} (\`gates.${pendingNames[index]}\`)`),
       '',
-      'Complete these gates before creating the PR.',
+      'Complete these gates before creating the PR:',
+      ...pendingNames.map(gate => `  - ${gateCompletionCommand(gate, state.sprint)}`),
     );
     if (pending.some(g => g === 'Code review' || g === 'Architect review')) {
       lines.push('', ...reviewGateEvidenceInstructions());
@@ -166,6 +205,7 @@ function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
   };
 }
 
+
 interface ShellCommandSegment {
   cwd: string;
   segment: string;
@@ -173,9 +213,87 @@ interface ShellCommandSegment {
   command: ParsedCommand;
 }
 
-function prCreateCommandContext(input: HookInput, cwd: string): { cwd: string } | null {
+interface PrCreateContext {
+  /** Directory the command runs in, after the tool cwd and any shell `cd`. */
+  cwd: string;
+  /** Repository named by `-R`/`--repo`/`GH_REPO`, when the PR is aimed at one explicitly. */
+  repo?: string;
+}
+
+function prCreateCommandContext(input: HookInput, cwd: string): PrCreateContext | null {
   const segment = commandSegments(input, cwd).find(({ words }) => isGhPrCreateCommand(words));
-  return segment ? { cwd: segment.cwd } : null;
+  if (!segment) return null;
+  const repo = ghRepoSelector(segment.words);
+  return { cwd: segment.cwd, ...(repo ? { repo } : {}) };
+}
+
+/** `gh pr create` flags that consume the following word, so it is never read as a flag. */
+const GH_PR_CREATE_FLAGS_WITH_VALUE = new Set([
+  '-t', '--title', '-b', '--body', '-F', '--body-file', '-B', '--base', '-H', '--head',
+  '-r', '--reviewer', '-a', '--assignee', '-l', '--label', '-m', '--milestone',
+  '-p', '--project', '-T', '--template', '--hostname', '--config',
+]);
+
+/**
+ * The repository a `gh pr create` is aimed at, from `-R x`, `-Rx`, `--repo x`,
+ * `--repo=x` (before or after `create`) or an inline `GH_REPO=x` prefix.
+ * `gh` has no `-C`: the directory it works in is the shell's, handled by `cd`.
+ */
+function ghRepoSelector(words: string[]): string | null {
+  let i = 0;
+  let repo: string | null = null;
+  while (isEnvAssignment(words[i])) {
+    if (words[i].startsWith('GH_REPO=')) repo = words[i].slice('GH_REPO='.length) || repo;
+    i++;
+  }
+  for (; i < words.length; i++) {
+    const word = words[i];
+    if (word === '--') break;
+    if (word === '-R' || word === '--repo') {
+      if (words[i + 1]) repo = words[i + 1];
+      i++;
+    } else if (word.startsWith('--repo=')) {
+      repo = word.slice('--repo='.length);
+    } else if (/^-R.+/.test(word)) {
+      repo = word.slice(2);
+    } else if (GH_PR_CREATE_FLAGS_WITH_VALUE.has(word)) {
+      i++;
+    }
+  }
+  return repo;
+}
+
+/** `owner/repo` (lowercase) and host from a remote URL or a `gh` repo selector. */
+function parseRepoReference(reference: string): { host?: string; slug: string } | null {
+  const text = reference.trim().replace(/\/+$/, '').replace(/\.git$/, '');
+  const url = text.match(/^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/([^/]+\/[^/]+)$/i)
+    ?? text.match(/^(?:[^@/:]+@)?([^/:]+):([^/]+\/[^/]+)$/);
+  if (url) return { host: url[1].toLowerCase(), slug: url[2].toLowerCase() };
+  const parts = text.split('/');
+  if (parts.length === 2 && parts.every(Boolean)) return { slug: text.toLowerCase() };
+  if (parts.length === 3 && parts.every(Boolean)) return { host: parts[0].toLowerCase(), slug: `${parts[1]}/${parts[2]}`.toLowerCase() };
+  return null;
+}
+
+/** True when some git remote of the checkout at `cwd` is the repository `repo` names. */
+function checkoutHasRemote(cwd: string, repo: string): boolean {
+  const target = parseRepoReference(repo);
+  if (!target) return false;
+  let urls: string[];
+  try {
+    urls = execFileSync('git', ['config', '--get-regexp', '^remote\\..*\\.url$'], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 3000,
+    }).split('\n').map(line => line.replace(/^\S+\s+/, '')).filter(Boolean);
+  } catch {
+    return false;
+  }
+  return urls.some(url => {
+    const remote = parseRepoReference(url);
+    return remote !== null && remote.slug === target.slug && (!target.host || target.host === remote.host);
+  });
 }
 
 function commandSegments(input: HookInput, cwd: string): ShellCommandSegment[] {
@@ -398,12 +516,16 @@ function reviewGateEvidenceInstructions(): string[] {
   ];
 }
 
-/** Check if a scorecard file exists for the given sprint. */
-function scorecardExists(sprint: SprintId, cwd: string): boolean {
+/** Absolute path where the scorecard for the given sprint is expected. */
+function scorecardPath(sprint: SprintId, cwd: string): string {
   const config = loadConfig(cwd);
   const pattern = config.scorecardPattern.replaceAll('*', String(sprint));
-  const scorecardPath = join(cwd, config.scorecardDir, pattern);
-  return existsSync(scorecardPath);
+  return join(cwd, config.scorecardDir, pattern);
+}
+
+/** Check if a scorecard file exists for the given sprint. */
+function scorecardExists(sprint: SprintId, cwd: string): boolean {
+  return existsSync(scorecardPath(sprint, cwd));
 }
 
 /** Auto-detect test pass, validate success, and PR merge from Bash output. */

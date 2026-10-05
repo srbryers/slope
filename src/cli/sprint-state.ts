@@ -1,6 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
-import { resolveRepoStatePath } from '../core/repo-state-scope.js';
+import { resolveRepoSourceCwd, resolveRepoStateCwd, resolveRepoStatePath, samePath } from '../core/repo-state-scope.js';
 import { sprintIdKey, sprintIdsEqual, type SprintId } from '../core/sprint-id.js';
 import { atomicWriteFileSync, withFileLockSync } from './atomic-write.js';
 import { listRepoWorktrees } from './session-scope.js';
@@ -93,15 +94,34 @@ export interface SprintRolloverLineage {
   reason?: string;
 }
 
+/** The first thing wrong with a sprint-state file, named by field. */
+export interface SprintStateProblem {
+  /** Dotted field path (`gates.tests`), or `JSON` for a parse error. */
+  field: string;
+  /** What is wrong, including the offending value: `must be true or false (found null)`. */
+  message: string;
+}
+
+/** Why a sprint-state file was refused, and how to fix it without discarding evidence. */
+export interface SprintStateDiagnosis extends SprintStateProblem {
+  /** Absolute path of the file that was read. */
+  path: string;
+  /** Next steps, most specific first. */
+  repair: string[];
+}
+
 export type SprintStateLoadResult =
   | { status: 'missing' }
-  | { status: 'corrupt'; path: string }
+  /** A planned, never-started draft: no sprint is in progress. Not evidence, not corrupt. */
+  | { status: 'draft'; path: string }
+  | { status: 'corrupt'; path: string; diagnosis: SprintStateDiagnosis }
   | { status: 'valid'; state: SprintState };
 
 export type SprintStateInitializationResult =
   | { status: 'created'; state: SprintState }
   | { status: 'existing'; state: SprintState }
-  | { status: 'corrupt'; path: string };
+  | { status: 'draft'; path: string }
+  | { status: 'corrupt'; path: string; diagnosis: SprintStateDiagnosis };
 
 const SPRINT_STATE_FILE = '.slope/sprint-state.json';
 
@@ -287,34 +307,42 @@ export function waivedReviewGateNames(state: SprintState): ReviewGateName[] {
   );
 }
 
-/** Load sprint state from .slope/sprint-state.json. Returns null if missing or malformed. */
+/** Canonical sprint key for an untrusted file value; null for anything but a valid id. */
+function sprintKeyOrNull(value: unknown): SprintId | null {
+  return typeof value === 'string' || typeof value === 'number' ? sprintIdKey(value) : null;
+}
+
+/** Lenient shape check + normalization shared by every reader. Null when unusable. */
+function normalizeSprintState(raw: any): SprintState | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const sprint = sprintKeyOrNull(raw.sprint);
+  if (sprint === null || typeof raw.phase !== 'string' || !raw.gates || typeof raw.gates !== 'object') {
+    return null;
+  }
+  // Validate all 5 gate keys exist and are booleans
+  for (const gate of ALL_GATES) {
+    if (typeof raw.gates[gate] !== 'boolean') return null;
+  }
+  return {
+    ...raw,
+    sprint,
+    ...(raw.rollover ? {
+      rollover: {
+        ...raw.rollover,
+        from_sprint: sprintKeyOrNull(raw.rollover.from_sprint),
+      },
+    } : {}),
+    review_gates: normalizeReviewGates(raw.review_gates),
+    review_requirements: normalizeReviewRequirements(raw.review_requirements),
+  } as SprintState;
+}
+
+/** Load sprint state from .slope/sprint-state.json. Returns null if missing, draft or malformed. */
 export function loadSprintState(cwd: string): SprintState | null {
   const statePath = sprintStatePath(cwd);
   if (!existsSync(statePath)) return null;
   try {
-    const raw = JSON.parse(readFileSync(statePath, 'utf8'));
-    const sprint = sprintIdKey(raw.sprint as SprintId);
-    if (sprint === null || typeof raw.phase !== 'string' || typeof raw.gates !== 'object') {
-      return null;
-    }
-    // Validate all 5 gate keys exist and are booleans
-    for (const gate of ALL_GATES) {
-      if (typeof raw.gates[gate] !== 'boolean') {
-        return null;
-      }
-    }
-    return {
-      ...raw,
-      sprint,
-      ...(raw.rollover ? {
-        rollover: {
-          ...raw.rollover,
-          from_sprint: sprintIdKey(raw.rollover.from_sprint as SprintId),
-        },
-      } : {}),
-      review_gates: normalizeReviewGates(raw.review_gates),
-      review_requirements: normalizeReviewRequirements(raw.review_requirements),
-    } as SprintState;
+    return normalizeSprintState(JSON.parse(readFileSync(statePath, 'utf8')));
   } catch {
     return null;
   }
@@ -328,80 +356,225 @@ function validEvidenceTimestamp(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && Number.isFinite(Date.parse(value));
 }
 
-/** Strict persisted-state shape used at mutation and rollover trust boundaries. */
-export function isValidSprintStateEvidence(value: unknown): value is SprintState {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+function describeFound(value: unknown): string {
+  if (value === undefined) return 'found missing';
+  const text = JSON.stringify(value) ?? String(value);
+  return `found ${text.length > 40 ? `${text.slice(0, 37)}...` : text}`;
+}
+
+function problem(field: string, expected: string, found: unknown): SprintStateProblem {
+  return { field, message: `must be ${expected} (${describeFound(found)})` };
+}
+
+/** The first gate that is not a plain boolean (a `null` gate is what bit Prelude), or null. */
+export function findGatesProblem(gates: unknown): SprintStateProblem | null {
+  if (!gates || typeof gates !== 'object' || Array.isArray(gates)) return problem('gates', 'an object of true/false gates', gates);
+  for (const gate of ALL_GATES) {
+    const value = (gates as Record<string, unknown>)[gate];
+    if (typeof value !== 'boolean') return problem(`gates.${gate}`, 'true or false', value);
+  }
+  return null;
+}
+
+/**
+ * The first thing wrong with persisted sprint state, or null when it is valid.
+ *
+ * Single source of truth for the strict shape: the guard's denial, `slope
+ * doctor`, the CLI's refusals and the write-time check all report this, so they
+ * cannot disagree about what is wrong or which field to fix.
+ */
+export function findSprintStateProblem(value: unknown): SprintStateProblem | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return problem('(root)', 'a JSON object', value);
+  }
   const state = value as Partial<SprintState>;
-  if (typeof state.sprint !== 'string' || sprintIdKey(state.sprint) === null
-    || typeof state.phase !== 'string' || !isSprintPhase(state.phase)
-    || !validEvidenceTimestamp(state.started_at) || !validEvidenceTimestamp(state.updated_at)
-    || !state.gates || typeof state.gates !== 'object') return false;
-  if (!ALL_GATES.every(gate => typeof state.gates?.[gate] === 'boolean')) return false;
+  if (typeof state.sprint !== 'string' || sprintIdKey(state.sprint) === null) {
+    return problem('sprint', 'a positive sprint id such as "64.6"', state.sprint);
+  }
+  if (typeof state.phase !== 'string' || !isSprintPhase(state.phase)) {
+    return problem('phase', `one of ${SPRINT_PHASES.join(', ')}`, state.phase);
+  }
+  if (!validEvidenceTimestamp(state.started_at)) return problem('started_at', 'an ISO-8601 timestamp', state.started_at);
+  if (!validEvidenceTimestamp(state.updated_at)) return problem('updated_at', 'an ISO-8601 timestamp', state.updated_at);
+  const badGates = findGatesProblem(state.gates);
+  if (badGates) return badGates;
 
   if (state.review_gates !== undefined) {
-    if (!state.review_gates || typeof state.review_gates !== 'object') return false;
+    if (!state.review_gates || typeof state.review_gates !== 'object') {
+      return problem('review_gates', 'an object', state.review_gates);
+    }
     for (const gate of REVIEW_GATES) {
       const review = state.review_gates[gate];
-      if (!review || typeof review !== 'object'
-        || !REVIEW_GATE_PROVENANCES.includes(review.provenance)
-        || !Array.isArray(review.evidence) || review.evidence.some(item => typeof item !== 'string')
-        || !validOptionalString(review.reviewer) || !validOptionalString(review.notes)
-        || (review.verdict !== undefined && !isReviewGateVerdict(review.verdict))
-        || !validOptionalString(review.packet)
-        || !validOptionalString(review.reviewed_commit)
-        || !validOptionalString(review.token_budget)
-        || (review.tokens_used !== undefined && (typeof review.tokens_used !== 'number' || !Number.isFinite(review.tokens_used)))
-        || !validOptionalString(review.over_budget_reason)
-        || (review.updated_at !== undefined && !validEvidenceTimestamp(review.updated_at))) return false;
+      const at = `review_gates.${gate}`;
+      if (!review || typeof review !== 'object') return problem(at, 'an object', review);
+      if (!REVIEW_GATE_PROVENANCES.includes(review.provenance)) {
+        return problem(`${at}.provenance`, `one of ${REVIEW_GATE_PROVENANCES.join(', ')}`, review.provenance);
+      }
+      if (!Array.isArray(review.evidence) || review.evidence.some(item => typeof item !== 'string')) {
+        return problem(`${at}.evidence`, 'an array of strings', review.evidence);
+      }
+      for (const key of ['reviewer', 'notes', 'packet', 'reviewed_commit', 'token_budget', 'over_budget_reason'] as const) {
+        if (!validOptionalString(review[key])) return problem(`${at}.${key}`, 'a string', review[key]);
+      }
+      if (review.verdict !== undefined && !isReviewGateVerdict(review.verdict)) {
+        return problem(`${at}.verdict`, 'pass, changes_requested or blocked', review.verdict);
+      }
+      if (review.tokens_used !== undefined && (typeof review.tokens_used !== 'number' || !Number.isFinite(review.tokens_used))) {
+        return problem(`${at}.tokens_used`, 'a finite number', review.tokens_used);
+      }
+      if (review.updated_at !== undefined && !validEvidenceTimestamp(review.updated_at)) {
+        return problem(`${at}.updated_at`, 'an ISO-8601 timestamp', review.updated_at);
+      }
     }
   }
 
   if (state.review_requirements !== undefined) {
-    if (!state.review_requirements || typeof state.review_requirements !== 'object') return false;
+    if (!state.review_requirements || typeof state.review_requirements !== 'object') {
+      return problem('review_requirements', 'an object', state.review_requirements);
+    }
     for (const gate of REVIEW_GATES) {
       const requirement = state.review_requirements[gate];
-      if (!requirement || typeof requirement !== 'object'
-        || !['required', 'recommended', 'optional', 'unspecified'].includes(requirement.priority)
-        || !validOptionalString(requirement.reason) || !validOptionalString(requirement.source)
-        || (requirement.updated_at !== undefined && !validEvidenceTimestamp(requirement.updated_at))) return false;
+      const at = `review_requirements.${gate}`;
+      if (!requirement || typeof requirement !== 'object') return problem(at, 'an object', requirement);
+      if (!['required', 'recommended', 'optional', 'unspecified'].includes(requirement.priority)) {
+        return problem(`${at}.priority`, 'required, recommended, optional or unspecified', requirement.priority);
+      }
+      for (const key of ['reason', 'source'] as const) {
+        if (!validOptionalString(requirement[key])) return problem(`${at}.${key}`, 'a string', requirement[key]);
+      }
+      if (requirement.updated_at !== undefined && !validEvidenceTimestamp(requirement.updated_at)) {
+        return problem(`${at}.updated_at`, 'an ISO-8601 timestamp', requirement.updated_at);
+      }
     }
   }
 
   if (state.rollover !== undefined) {
     const lineage = state.rollover;
+    if (!lineage || typeof lineage !== 'object') return problem('rollover', 'an object', lineage);
+    if (typeof lineage.transition_id !== 'string' || !/^[a-f0-9]{16}$/.test(lineage.transition_id)) {
+      return problem('rollover.transition_id', '16 lowercase hex characters', lineage.transition_id);
+    }
+    if (typeof lineage.from_sprint !== 'string' || sprintIdKey(lineage.from_sprint) === null) {
+      return problem('rollover.from_sprint', 'a positive sprint id', lineage.from_sprint);
+    }
     const portablePath = typeof lineage.audit_path === 'string' ? lineage.audit_path.replaceAll('\\', '/') : '';
-    if (typeof lineage.transition_id !== 'string' || !/^[a-f0-9]{16}$/.test(lineage.transition_id)
-      || typeof lineage.from_sprint !== 'string' || sprintIdKey(lineage.from_sprint) === null
-      || !portablePath || isAbsolute(portablePath) || portablePath.split('/').includes('..')
-      || !validEvidenceTimestamp(lineage.recorded_at)
-      || typeof lineage.forced !== 'boolean'
-      || !validOptionalString(lineage.reason)) return false;
+    if (!portablePath || isAbsolute(portablePath) || portablePath.split('/').includes('..')) {
+      return problem('rollover.audit_path', 'a repository-relative path without ".."', lineage.audit_path);
+    }
+    if (!validEvidenceTimestamp(lineage.recorded_at)) return problem('rollover.recorded_at', 'an ISO-8601 timestamp', lineage.recorded_at);
+    if (typeof lineage.forced !== 'boolean') return problem('rollover.forced', 'true or false', lineage.forced);
+    if (!validOptionalString(lineage.reason)) return problem('rollover.reason', 'a string', lineage.reason);
   }
-  return true;
+  return null;
+}
+
+/** Strict persisted-state shape used at mutation and rollover trust boundaries. */
+export function isValidSprintStateEvidence(value: unknown): value is SprintState {
+  return findSprintStateProblem(value) === null;
+}
+
+/**
+ * The command that completes one gate, in a form `slope sprint` accepts. Review
+ * gates cannot be completed bare: they need provenance, so the evidence flags
+ * are part of the command.
+ */
+export function gateCompletionCommand(gate: GateName, sprint?: SprintId): string {
+  switch (gate) {
+    case 'tests': return '`slope sprint gate tests`';
+    case 'scorecard': return '`slope validate`';
+    case 'review_md': return `\`slope review --sprint=${sprint ?? '<sprint>'}\``;
+    case 'code_review':
+    case 'architect_review':
+      return `\`slope sprint gate ${gate} --reviewer=<id> --evidence=<path-or-url>\` or \`slope sprint gate ${gate} --pr-review=<url-or-id>\``;
+  }
+}
+
+/**
+ * Next steps for a bad sprint-state file. None of them rewrite evidence for
+ * the operator: the file is fixed by hand, or set aside with a copy kept.
+ */
+function repairSteps(path: string, bad: SprintStateProblem): string[] {
+  const gate = bad.field.startsWith('gates.') ? bad.field.slice('gates.'.length) : null;
+  const fix = bad.field === 'JSON'
+    ? `Fix the JSON syntax error in ${path}, then run \`slope doctor\` to confirm.`
+    : gate && ALL_GATES.includes(gate as GateName)
+      ? `Edit ${path} and set \`${bad.field}\` to \`false\` (do not set it \`true\` by hand), run \`slope doctor\` to confirm, then complete the gate with ${gateCompletionCommand(gate as GateName)}.`
+      : `Edit ${path} and correct \`${bad.field}\` (${bad.message}), then run \`slope doctor\` to confirm.`;
+  return [
+    fix,
+    `Only if this sprint was abandoned: set the file aside, keeping a copy, with \`mv "${path}" "${path}.bak"\`.`,
+  ];
+}
+
+/** Lines naming the file, the bad field and the repair — shared by the guard, doctor and the CLI. */
+export function formatSprintStateDiagnosis(diagnosis: SprintStateDiagnosis): string[] {
+  return [
+    `Sprint evidence file: ${diagnosis.path}`,
+    `Problem: \`${diagnosis.field}\` ${diagnosis.message}`,
+    ...diagnosis.repair.map((step, index) => `${index === 0 ? 'Repair' : 'Alternative'}: ${step}`),
+  ];
+}
+
+/** True for a planned, never-started draft, which is "no sprint in progress", not corruption.
+ *  Gates may be null or false (nothing completed); both mean no sprint has started, and the
+ *  absent timestamps confirm it. Deliberately narrow beyond that: a `true` gate, any timestamp,
+ *  review evidence or lineage makes the file genuine evidence, so it stays corrupt. */
+function isPlannedDraft(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const draft = raw as Record<string, unknown>;
+  if (draft.phase !== 'planned') return false;
+  if (draft.sprint !== undefined && draft.sprint !== null && typeof draft.sprint !== 'string' && typeof draft.sprint !== 'number') return false;
+  for (const key of ['started_at', 'updated_at', 'rollover', 'review_gates', 'review_requirements']) {
+    if (draft[key] !== undefined && draft[key] !== null) return false;
+  }
+  if (draft.gates === undefined || draft.gates === null) return true;
+  if (typeof draft.gates !== 'object' || Array.isArray(draft.gates)) return false;
+  return Object.values(draft.gates as Record<string, unknown>).every(value => value === null || value === false);
+}
+
+/** Read and classify one sprint-state file: missing, draft, corrupt (with a diagnosis) or valid. */
+export function readSprintStateFile(path: string): SprintStateLoadResult {
+  if (!existsSync(path)) return { status: 'missing' };
+  const corrupt = (found: SprintStateProblem): SprintStateLoadResult => ({
+    status: 'corrupt',
+    path,
+    diagnosis: { path, ...found, repair: repairSteps(path, found) },
+  });
+
+  let raw: any;
+  try {
+    raw = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    return corrupt({ field: 'JSON', message: `is not valid JSON: ${(error as Error).message}` });
+  }
+
+  const normalized = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? {
+        ...raw,
+        sprint: sprintKeyOrNull(raw.sprint),
+        ...(raw.rollover && typeof raw.rollover === 'object' ? {
+          rollover: {
+            ...raw.rollover,
+            from_sprint: sprintKeyOrNull(raw.rollover.from_sprint),
+          },
+        } : {}),
+      }
+    : raw;
+  const found = findSprintStateProblem(normalized);
+  if (found) {
+    if (isPlannedDraft(raw)) return { status: 'draft', path };
+    // Report the sprint as written, not as the normalizer left it.
+    return corrupt(found.field === 'sprint' ? problem('sprint', 'a positive sprint id such as "64.6"', raw?.sprint) : found);
+  }
+  const state = normalizeSprintState(raw);
+  return state
+    ? { status: 'valid', state }
+    : corrupt({ field: '(root)', message: 'could not be normalized' });
 }
 
 /** Distinguish absent local state from corrupt evidence that must fail closed. */
 export function loadSprintStateResult(cwd: string): SprintStateLoadResult {
-  const path = sprintStatePath(cwd);
-  if (!existsSync(path)) return { status: 'missing' };
-  try {
-    const raw = JSON.parse(readFileSync(path, 'utf8'));
-    const normalized = {
-      ...raw,
-      sprint: sprintIdKey(raw.sprint as SprintId),
-      ...(raw.rollover ? {
-        rollover: {
-          ...raw.rollover,
-          from_sprint: sprintIdKey(raw.rollover.from_sprint as SprintId),
-        },
-      } : {}),
-    };
-    if (!isValidSprintStateEvidence(normalized)) return { status: 'corrupt', path };
-  } catch {
-    return { status: 'corrupt', path };
-  }
-  const state = loadSprintState(cwd);
-  return state ? { status: 'valid', state } : { status: 'corrupt', path };
+  return readSprintStateFile(sprintStatePath(cwd));
 }
 
 /** True when sprint-state represents an active workflow sprint. */
@@ -409,8 +582,47 @@ export function isActiveSprintState(state: SprintState | null): state is SprintS
   return Boolean(state && state.phase !== 'complete' && !isSprintComplete(state));
 }
 
-function sprintStatePath(cwd: string): string {
-  return resolveRepoStatePath(cwd, SPRINT_STATE_FILE);
+/** True when git tracks `.slope/sprint-state.json` under `root`. */
+function isTrackedSprintState(root: string): boolean {
+  try {
+    execFileSync('git', ['ls-files', '--error-unmatch', '--', SPRINT_STATE_FILE], {
+      cwd: root,
+      stdio: 'ignore',
+      timeout: 3000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The sprint-state file that governs `cwd`.
+ *
+ * A tracked sprint-state.json is evidence for the branch it is committed on, so
+ * each checkout reads and writes its own copy; a linked worktree never inherits
+ * the primary checkout's file from whatever other branch happens to be open
+ * there (#748). An ignored sprint-state.json is shared operational state and
+ * stays with the primary checkout, as before. Sessions, claims and every other
+ * store keep resolving through `resolveRepoStatePath` and are unaffected.
+ *
+ * Policy, in order:
+ * 1. This checkout is the shared-state owner: its own file.
+ * 2. This checkout has a tracked copy: that copy (branch-local evidence).
+ * 3. The shared copy is tracked on the primary's branch: this checkout's own
+ *    path, which may not exist. No evidence for this branch means none, not
+ *    the primary's.
+ * 4. Otherwise: the shared (ignored) copy.
+ */
+export function sprintStatePath(cwd: string): string {
+  const shared = resolveRepoStatePath(cwd, SPRINT_STATE_FILE);
+  const localRoot = resolveRepoSourceCwd(cwd);
+  const sharedRoot = resolveRepoStateCwd(cwd);
+  if (samePath(localRoot, sharedRoot)) return shared;
+  const local = join(localRoot, SPRINT_STATE_FILE);
+  if (existsSync(local) && isTrackedSprintState(localRoot)) return local;
+  if (existsSync(shared) && isTrackedSprintState(sharedRoot)) return local;
+  return shared;
 }
 
 /** Where sprint state actually lives for this checkout, repo-relative where
@@ -424,6 +636,13 @@ export function sprintStateLocation(cwd: string): string {
 
 function saveSprintStateUnlocked(filePath: string, state: SprintState, touchUpdatedAt = true): void {
   if (touchUpdatedAt) state.updated_at = new Date().toISOString();
+  // Refuse to persist gates the loader would then call corrupt. Nothing is
+  // written, so the existing file survives. Gates only: the full shape check
+  // would also reject legacy numeric ids that older callers still hand in.
+  const bad = findGatesProblem(state.gates);
+  if (bad) {
+    throw new Error(`Refusing to write invalid sprint state to ${filePath}: \`${bad.field}\` ${bad.message}. Nothing was written.`);
+  }
   atomicWriteFileSync(filePath, JSON.stringify(state, null, 2) + '\n');
 }
 
@@ -487,7 +706,8 @@ export function initializeSprintState(
   return withFileLockSync(filePath, () => {
     const loaded = loadSprintStateResult(cwd);
     if (loaded.status === 'valid') return { status: 'existing', state: loaded.state };
-    if (loaded.status === 'corrupt') return loaded;
+    // A draft is not evidence, but it is someone's file: never overwrite it silently.
+    if (loaded.status === 'corrupt' || loaded.status === 'draft') return loaded;
     saveSprintStateUnlocked(filePath, state, false);
     return { status: 'created', state };
   });
@@ -512,7 +732,9 @@ export function replaceSprintState(
   return withFileLockSync(filePath, () => {
     const loaded = loadSprintStateResult(cwd);
     if (loaded.status !== 'valid') {
-      if (loaded.status === 'corrupt') throw new Error(`Sprint state is corrupt and was preserved at ${filePath}.`);
+      if (loaded.status === 'corrupt') {
+        throw new Error(`Sprint state is corrupt and was preserved. ${formatSprintStateDiagnosis(loaded.diagnosis).join(' ')}`);
+      }
       return null;
     }
     const previous = loaded.state;

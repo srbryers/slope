@@ -19,6 +19,7 @@ import {
   isReviewGateName,
   isReviewGateVerdict,
   validateReviewGateCompletion,
+  formatSprintStateDiagnosis,
   SPRINT_PHASES,
   type GateName,
   type ReviewGateCompletionInput,
@@ -26,6 +27,7 @@ import {
   type ReviewGateState,
   type SprintPhase,
   type SprintState,
+  type SprintStateDiagnosis,
 } from '../sprint-state.js';
 import {
   WorkflowEngine,
@@ -73,7 +75,7 @@ function getDefinition(exec: WorkflowExecution, cwd: string): { def: WorkflowDef
   return { def: loadWorkflow(exec.workflow_name, cwd), drifted: false };
 }
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join, dirname, basename, isAbsolute, relative } from 'node:path';
+import { join, dirname, basename, isAbsolute } from 'node:path';
 import { createStore } from '../../store/index.js';
 import { formatCliError } from '../error-reporter.js';
 import {
@@ -542,10 +544,22 @@ function requireMatchingSprintOrRollover(
   process.exit(1);
 }
 
+/** Print a refusal that names the file, the bad field and the repair. */
+function printCorruptSprintState(refusal: string, diagnosis: SprintStateDiagnosis): void {
+  console.error(refusal);
+  for (const line of formatSprintStateDiagnosis(diagnosis)) console.error(line);
+}
+
+/** A planned draft is not evidence and not corrupt, but it is never overwritten silently. */
+function printDraftSprintState(refusal: string, path: string): void {
+  console.error(`${refusal}: ${path} is a planned draft (no sprint in progress), left untouched.`);
+  console.error(`To start a sprint, set the draft aside, keeping a copy: \`mv "${path}" "${path}.bak"\`, then retry.`);
+}
+
 function failOnCorruptSprintState(cwd: string): void {
   const loaded = loadSprintStateResult(cwd);
   if (loaded.status !== 'corrupt') return;
-  console.error(`Refusing to change sprint state: corrupt evidence was preserved at ${relative(cwd, loaded.path)}.`);
+  printCorruptSprintState('Refusing to change sprint state: corrupt evidence was preserved.', loaded.diagnosis);
   process.exit(1);
 }
 
@@ -667,7 +681,11 @@ async function beginCommand(args: string[], cwd: string): Promise<void> {
   const sprintNumber = sprintNumberForCwd(cwd, sprint);
   const initialized = initializeSprintState(cwd, createSprintState(sprint, 'planning'));
   if (initialized.status === 'corrupt') {
-    console.error(`Refusing to begin: corrupt sprint evidence was preserved at ${relative(cwd, initialized.path)}.`);
+    printCorruptSprintState('Refusing to begin: corrupt sprint evidence was preserved.', initialized.diagnosis);
+    process.exit(1);
+  }
+  if (initialized.status === 'draft') {
+    printDraftSprintState('Refusing to begin', initialized.path);
     process.exit(1);
   }
   let state = initialized.state;
@@ -861,7 +879,11 @@ async function startCommand(args: string[], cwd: string): Promise<void> {
 
   const initialized = initializeSprintState(cwd, createSprintState(sprint, phase));
   if (initialized.status === 'corrupt') {
-    console.error(`Refusing to start: corrupt sprint evidence was preserved at ${relative(cwd, initialized.path)}.`);
+    printCorruptSprintState('Refusing to start: corrupt sprint evidence was preserved.', initialized.diagnosis);
+    process.exit(1);
+  }
+  if (initialized.status === 'draft') {
+    printDraftSprintState('Refusing to start', initialized.path);
     process.exit(1);
   }
   if (initialized.status === 'existing') {
@@ -1759,7 +1781,7 @@ async function portableResumeCommand(args: string[], cwd: string): Promise<void>
   const config = loadConfig(cwd);
   const loadedState = loadSprintStateResult(cwd);
   if (loadedState.status === 'corrupt') {
-    console.error(`Portable resume refused: corrupt sprint evidence was preserved at ${relative(cwd, loadedState.path)}.`);
+    printCorruptSprintState('Portable resume refused: corrupt sprint evidence was preserved.', loadedState.diagnosis);
     process.exit(1);
     return;
   }
