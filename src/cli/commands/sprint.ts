@@ -1,6 +1,7 @@
 import {
   loadSprintState,
   loadSprintStateResult,
+  sprintStatePath,
   saveSprintState,
   createSprintState,
   initializeSprintState,
@@ -505,6 +506,7 @@ function requireMatchingSprintOrRollover(
     verifySprintRolloverLineage(cwd, state);
   } catch (error) {
     console.error(`Refusing to ${action}: ${(error as Error).message}`);
+    printSprintEvidenceContext(cwd, state, 'rollover');
     console.error(`After restoring the tracked rollover audit, retry: ${retryCommand}`);
     process.exit(1);
   }
@@ -518,6 +520,7 @@ function requireMatchingSprintOrRollover(
     });
   } catch (error) {
     console.error(`Refusing to ${action}: ${(error as Error).message}`);
+    printSprintEvidenceContext(cwd, state, 'sprint', requestedSprint);
     console.error(`After resolving the sprint state, retry: ${retryCommand}`);
     process.exit(1);
   }
@@ -530,6 +533,7 @@ function requireMatchingSprintOrRollover(
   ) return true;
 
   console.error(`Refusing to ${action} — sprint-state.json is for ${assessment.from_label}, not ${assessment.to_label}.`);
+  printSprintEvidenceContext(cwd, state, 'sprint', requestedSprint);
   const eligibilityIssues = assessment.issues.filter(issue => issue.code !== 'from_not_terminal');
   if (eligibilityIssues.length === 0) {
     const command = assessment.from_terminal
@@ -542,6 +546,12 @@ function requireMatchingSprintOrRollover(
   }
   console.error(`After resolving the rollover, retry: ${retryCommand}`);
   process.exit(1);
+}
+
+/** Name the selected evidence and field for identity or lineage refusals. */
+function printSprintEvidenceContext(cwd: string, state: SprintState, field: 'sprint' | 'rollover', requestedSprint?: SprintId): void {
+  console.error(`Sprint evidence file: ${sprintStatePath(cwd)}`);
+  console.error(`State: Sprint ${formatSprintNumber(state.sprint)} (\`${field}\`)${requestedSprint ? `; requested Sprint ${formatSprintNumber(requestedSprint)}` : ''}.`);
 }
 
 /** Print a refusal that names the file, the bad field and the repair. */
@@ -1212,22 +1222,25 @@ async function statusCommand(
   store: ReturnType<typeof getStore>,
   json = false,
 ): Promise<void> {
-  const state = loadSprintState(cwd);
+  // Classify before projection: the compatibility loader normalizes nested
+  // review corruption and must not turn it into a healthy status display.
+  const loaded = loadSprintStateResult(cwd);
+  const state = loaded.status === 'valid' ? loaded.state : null;
   if (!state) {
     // A file that exists but is bad must not read as "no sprint".
-    const loaded = loadSprintStateResult(cwd);
     const diagnosis = loaded.status === 'corrupt' ? loaded.diagnosis : undefined;
+    if (diagnosis) process.exitCode = 1;
     if (json) {
       console.log(JSON.stringify({
         mode: 'lifecycle',
         sprint: null,
-        status: 'not_started',
+        status: diagnosis ? 'evidence_error' : 'not_started',
         phase: null,
         gates: null,
         review_gates: null,
         actors: [],
         claims: [],
-        ...(diagnosis ? { evidence_error: { path: diagnosis.path, field: diagnosis.field, message: diagnosis.message } } : {}),
+        ...(diagnosis ? { evidence_error: diagnosis } : {}),
       }, null, 2));
       return;
     }

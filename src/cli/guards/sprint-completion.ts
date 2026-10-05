@@ -232,10 +232,9 @@ interface PrCreateContext {
 
 function prCreateCommandContexts(input: HookInput, cwd: string): PrCreateContext[] {
   return commandSegments(input, cwd)
-    .filter(({ words }) => isGhPrCreateCommand(words))
-    .map(segment => {
-      const repo = ghRepoSelector(segment.words);
-      return { cwd: segment.cwd, ...(repo ? { repo } : {}) };
+    .flatMap(segment => {
+      const args = ghPrCreateArguments(segment.words);
+      return args ? [{ cwd: segment.cwd, ...(args.repo ? { repo: args.repo } : {}) }] : [];
     });
 }
 
@@ -243,37 +242,58 @@ function prCreateCommandContexts(input: HookInput, cwd: string): PrCreateContext
 const GH_PR_CREATE_FLAGS_WITH_VALUE = new Set([
   '-t', '--title', '-b', '--body', '-F', '--body-file', '-B', '--base', '-H', '--head',
   '-r', '--reviewer', '-a', '--assignee', '-l', '--label', '-m', '--milestone',
-  '-p', '--project', '-T', '--template', '--hostname', '--config',
+  '-p', '--project', '-T', '--template', '--recover', '--hostname', '--config',
 ]);
 
 /**
- * The repository a `gh pr create` is aimed at, from `-R x`, `-Rx`, `--repo x`,
- * `--repo=x` (before or after `create`) or an inline `GH_REPO=x` prefix.
- * `gh` has no `-C`: the directory it works in is the shell's, handled by `cd`.
+ * Consume one gh flag exactly once. String values can themselves look like
+ * selectors; attached short values end the cluster (`-dt-Rother/thing` is a
+ * draft title, whereas `-dRother/thing` selects a repository).
  */
-function ghRepoSelector(words: string[]): string | null {
-  let i = 0;
-  let repo: string | null = null;
-  while (isEnvAssignment(words[i])) {
-    if (words[i].startsWith('GH_REPO=')) repo = words[i].slice('GH_REPO='.length) || repo;
-    i++;
-  }
-  for (; i < words.length; i++) {
-    const word = words[i];
-    if (word === '--') break;
-    if (word === '-R' || word === '--repo') {
-      if (words[i + 1]) repo = words[i + 1];
-      i++;
-    } else if (word.startsWith('--repo=')) {
-      repo = word.slice('--repo='.length);
-    } else if (/^-R.+/.test(word)) {
-      // `-Rx` and `-R=x` both name x.
-      repo = word.slice(2).replace(/^=/, '');
-    } else if (GH_PR_CREATE_FLAGS_WITH_VALUE.has(word)) {
-      i++;
+function consumeGhFlag(words: string[], index: number): { next: number; repo?: string } {
+  const word = words[index];
+  if (word.startsWith('--')) {
+    const equals = word.indexOf('=');
+    const flag = equals < 0 ? word : word.slice(0, equals);
+    if (flag === '--repo' || GH_PR_CREATE_FLAGS_WITH_VALUE.has(flag)) {
+      const value = equals < 0 ? words[index + 1] : word.slice(equals + 1);
+      return { next: index + (equals < 0 ? 2 : 1), ...(flag === '--repo' ? { repo: value ?? '' } : {}) };
+    }
+  } else {
+    for (let offset = 1; offset < word.length; offset++) {
+      const flag = `-${word[offset]}`;
+      if (flag !== '-R' && !GH_PR_CREATE_FLAGS_WITH_VALUE.has(flag)) continue;
+      const attached = word.slice(offset + 1);
+      const value = attached ? attached.replace(/^=/, '') : words[index + 1];
+      return { next: index + (attached ? 1 : 2), ...(flag === '-R' ? { repo: value ?? '' } : {}) };
     }
   }
-  return repo;
+  return { next: index + 1 };
+}
+
+/** Recognition and repo selection share value consumption and prefix handling. */
+function ghPrCreateArguments(words: string[]): { repo: string | null } | null {
+  const prefix = commandPrefix(words, 0);
+  if (words[prefix.index] !== 'gh') return null;
+  let repo: string | undefined;
+  let flags = true;
+  const commands: string[] = [];
+  let i = prefix.index + 1;
+  for (; i < words.length; i++) {
+    const word = words[i];
+    if (flags && word === '--') {
+      flags = false;
+    } else if (flags && word.startsWith('-')) {
+      const flag = consumeGhFlag(words, i);
+      if (flag.repo !== undefined) repo = flag.repo;
+      i = flag.next - 1;
+    } else {
+      commands.push(word);
+    }
+  }
+  if (commands[0] !== 'pr' || !['create', 'new'].includes(commands[1])) return null;
+  // An empty explicit selector falls back to GH_REPO, as gh does.
+  return { repo: repo || prefix.ghRepo };
 }
 
 /** `owner/repo` (lowercase) and host from a remote URL or a `gh` repo selector. */
@@ -377,43 +397,6 @@ function cdCommandTarget(words: string[]): string | null {
   return target;
 }
 
-function isGhPrCreateCommand(words: string[]): boolean {
-  let i = skipCommandPrefix(words, 0);
-  if (words[i] !== 'gh') return false;
-  i++;
-
-  i = skipGhGlobalFlags(words, i);
-  if (words[i] !== 'pr') return false;
-  // `--repo`/`-R` are accepted between `pr` and `create` as well.
-  return words[skipGhGlobalFlags(words, i + 1)] === 'create';
-}
-
-const GH_GLOBAL_FLAGS_WITH_VALUE = new Set([
-  '-R',
-  '--repo',
-  '--hostname',
-  '--config',
-]);
-
-function skipGhGlobalFlags(words: string[], start: number): number {
-  let i = start;
-  while (words[i]?.startsWith('-')) {
-    const flag = words[i];
-    if (flag === '--') return i + 1;
-    if (flag.includes('=')) {
-      i++;
-    } else if (GH_GLOBAL_FLAGS_WITH_VALUE.has(flag)) {
-      i += 2;
-    } else {
-      i++;
-    }
-  }
-  return i;
-}
-
-
-
-
 /** `slope review <these>` manage review state; they do not generate the
  *  review markdown, so they must not satisfy the review_md gate. */
 const REVIEW_STATE_SUBCOMMANDS = new Set([
@@ -452,11 +435,44 @@ function skipSlopeExecutable(words: string[]): number {
 }
 
 function skipCommandPrefix(words: string[], start: number): number {
+  return commandPrefix(words, start).index;
+}
+
+/** Literal assignments and env wrappers, shared by recognition and GH_REPO selection. */
+function commandPrefix(words: string[], start: number): { index: number; ghRepo: string | null } {
   let i = start;
-  if (words[i] === 'env') i++;
-  while (isEnvAssignment(words[i])) i++;
-  if (words[i] === 'command') i++;
-  return i;
+  let ghRepo: string | null = null;
+  while (i < words.length) {
+    while (isEnvAssignment(words[i])) {
+      if (words[i].startsWith('GH_REPO=')) ghRepo = words[i].slice('GH_REPO='.length) || null;
+      i++;
+    }
+    if (words[i] === 'command') {
+      i++;
+      if (words[i] === '--') i++;
+    } else if (words[i] === 'env') {
+      i++;
+      while (words[i]?.startsWith('-')) {
+        const flag = words[i];
+        if (flag === '--') { i++; break; }
+        if (flag === '-i' || flag === '--ignore-environment') {
+          ghRepo = null;
+          i++;
+        } else if (flag === '-u' || flag === '--unset') {
+          if (words[i + 1] === 'GH_REPO') ghRepo = null;
+          i += 2;
+        } else if (flag.startsWith('--unset=')) {
+          if (flag.slice('--unset='.length) === 'GH_REPO') ghRepo = null;
+          i++;
+        } else {
+          break;
+        }
+      }
+    } else {
+      break;
+    }
+  }
+  return { index: i, ghRepo };
 }
 
 function isEnvAssignment(word: string | undefined): boolean {

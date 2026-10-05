@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { isAbsolute, resolve } from 'node:path';
 import {
   PRELUDE_DRAFT,
   activeState,
@@ -9,6 +9,7 @@ import {
   initRepo,
   nullGateActiveState,
   writeConfig,
+  writeFile,
   writeState,
 } from '../../helpers/sprint-evidence-fixtures.js';
 
@@ -102,6 +103,123 @@ describe('gate and phase refuse bad evidence with the diagnosis, never "No activ
     expect(text.stdout).toContain(`Sprint evidence file: ${path}`);
     expect(text.stdout).not.toContain('No active sprint state');
     expect(json.evidence_error).toMatchObject({ path, field: 'gates.tests' });
+  });
+});
+
+describe('sprint status classifies evidence before projecting it', () => {
+  function badProvenance(): Record<string, unknown> {
+    const state = activeState('72') as any;
+    state.review_gates.code_review.provenance = 'vibes';
+    return state;
+  }
+
+  it.each<[string, () => Record<string, unknown>, string]>([
+    ['bad nested review provenance', badProvenance, 'review_gates.code_review.provenance'],
+    ['unknown phase', () => ({ ...activeState('72'), phase: 'vibes' }), 'phase'],
+    ['unreadable start time', () => ({ ...activeState('72'), started_at: 'last tuesday' }), 'started_at'],
+  ])('reports %s with the same file, field and repair as doctor and gate, preserving bytes', (_label, make, field) => {
+    const root = initRepo();
+    writeConfig(root);
+    const path = writeState(root, make());
+    const before = readFileSync(path, 'utf8');
+
+    const text = slope(root, ['sprint', 'status']);
+    const jsonRun = slope(root, ['sprint', 'status', '--json']);
+    const doctor = slope(root, ['doctor']);
+    const gate = slope(root, ['sprint', 'gate', 'tests']);
+    const json = JSON.parse(jsonRun.stdout);
+
+    expect(text.stdout).toContain(`Sprint evidence file: ${path}`);
+    expect(text.stdout).toContain(`Problem: \`${field}\``);
+    expect(text.stdout).not.toContain('Sprint 72 - status');
+    expect(text.status).not.toBe(0);
+    expect(jsonRun.status).not.toBe(0);
+    expect(json).toMatchObject({ sprint: null, status: 'evidence_error', phase: null, gates: null, review_gates: null });
+    expect(json.evidence_error).toMatchObject({ path, field });
+    expect(isAbsolute(json.evidence_error.path)).toBe(true);
+    expect(json.evidence_error.repair.length).toBeGreaterThan(0);
+
+    for (const output of [doctor.stdout, gate.stderr]) {
+      expect(output).toContain(`Sprint evidence file: ${path}`);
+      expect(output).toContain(`\`${field}\` ${json.evidence_error.message}`);
+      for (const step of json.evidence_error.repair) expect(output).toContain(step);
+    }
+    for (const step of json.evidence_error.repair) expect(text.stdout).toContain(step);
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+});
+
+describe('sprint evidence refusals name the selected file and field', () => {
+  function roadmapSprint(id: number, dependsOn: number[] = []) {
+    return {
+      id, theme: `Sprint ${id}`, par: 3, slope: 1, type: 'architecture', status: 'planned', depends_on: dependsOn,
+      tickets: [1, 2, 3].map(n => ({ key: `S${id}-${n}`, title: `T${n}`, club: 'wedge', complexity: 'small' })),
+    };
+  }
+
+  function activeSeventy(): { root: string; path: string; before: string } {
+    const root = initRepo();
+    writeConfig(root);
+    writeFile(root, 'docs/backlog/roadmap.json', JSON.stringify({
+      name: 'Evidence roadmap',
+      phases: [{ name: 'P', sprints: [69, 70, 71] }],
+      sprints: [roadmapSprint(69), roadmapSprint(70), roadmapSprint(71)],
+    }, null, 2));
+    const path = writeState(root, activeState('70'));
+    return { root, path, before: readFileSync(path, 'utf8') };
+  }
+
+  it.each([
+    [['sprint', 'start', '--number=71', '--force']],
+    [['sprint', 'begin', '--sprint=71', '--ticket=S71-1']],
+  ])('`%s` names the file and sprint field, offers audited rollover, and preserves bytes', (args) => {
+    const { root, path, before } = activeSeventy();
+    const result = slope(root, args);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('sprint-state.json is for S70, not S71');
+    expect(isAbsolute(path)).toBe(true);
+    expect(result.stderr).toContain(`Sprint evidence file: ${path}`);
+    expect(result.stderr).toContain('State: Sprint 70 (`sprint`); requested Sprint 71.');
+    expect(result.stderr).toContain('slope sprint rollover --from=70 --to=71 --force --reason="<why>"');
+    expect(result.stderr).toContain(`retry: slope sprint ${args[1]}`);
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+
+  it.each(['start', 'begin'])('%s names the file and rollover field when its lineage audit is missing', (command) => {
+    const { root } = activeSeventy();
+    const path = writeState(root, {
+      ...activeState('70'),
+      rollover: {
+        transition_id: '0123456789abcdef', from_sprint: '69',
+        audit_path: 'docs/retros/rollovers/missing.json', recorded_at: '2026-10-01T00:00:00.000Z',
+        forced: true, reason: 'test',
+      },
+    });
+    const before = readFileSync(path, 'utf8');
+    const args = command === 'start' ? ['--number=70'] : ['--sprint=70', '--ticket=S70-1'];
+    const result = slope(root, ['sprint', command, ...args]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('lineage audit is missing');
+    expect(isAbsolute(path)).toBe(true);
+    expect(result.stderr).toContain(`Sprint evidence file: ${path}`);
+    expect(result.stderr).toContain('`rollover`');
+    expect(result.stderr).toContain('After restoring the tracked rollover audit, retry:');
+    expect(readFileSync(path, 'utf8')).toBe(before);
+  });
+
+  it('names the file and sprint field when roadmap eligibility cannot be read', () => {
+    const { root, path, before } = activeSeventy();
+    writeFile(root, 'docs/backlog/roadmap.json', '{broken');
+    const result = slope(root, ['sprint', 'start', '--number=71', '--force']);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Could not parse roadmap');
+    expect(result.stderr).toContain(`Sprint evidence file: ${path}`);
+    expect(result.stderr).toContain('State: Sprint 70 (`sprint`); requested Sprint 71.');
+    expect(result.stderr).toContain('After resolving the sprint state, retry:');
+    expect(readFileSync(path, 'utf8')).toBe(before);
   });
 });
 

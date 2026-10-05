@@ -3,7 +3,7 @@ import { readFileSync, rmSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { sprintCompletionGuard } from '../../../src/cli/guards/sprint-completion.js';
 import { loadSprintState, loadSprintStateResult, sprintStatePath } from '../../../src/cli/sprint-state.js';
-import type { HookInput } from '../../../src/core/index.js';
+import type { GuardResult, HookInput } from '../../../src/core/index.js';
 import {
   PRELUDE_DRAFT,
   SPRINT_STATE,
@@ -314,6 +314,94 @@ describe('#748 sprint evidence belongs to the checkout the command runs in', () 
       expect(result.decision).toBeUndefined();
       expect(result.context).toContain('not enforced');
     });
+  });
+});
+
+describe('gh pr create consumes values before selecting a repository', () => {
+  function incompleteRepo(): string {
+    const root = initRepo();
+    writeConfig(root);
+    writeState(root, activeState('70'));
+    commitAll(root, 'incomplete sprint 70');
+    git(root, ['remote', 'add', 'origin', 'https://github.com/acme/app.git']);
+    return root;
+  }
+
+  function expectLocalGates(result: GuardResult, root: string, command: string): void {
+    expect(result.decision, command).toBe('deny');
+    expect(isAbsolute(join(root, SPRINT_STATE))).toBe(true);
+    expect(result.blockReason, command).toContain(join(root, SPRINT_STATE));
+    expect(result.blockReason, command).toContain('Sprint 70 has incomplete gates');
+  }
+
+  function expectOtherRepository(result: GuardResult, command: string): void {
+    expect(result.decision, command).toBeUndefined();
+    expect(result.context, command).toContain('not enforced');
+    expect(result.context, command).toContain('targets other/thing,');
+  }
+
+  // Every value-taking create flag from gh 2.93's help, plus retained global flags.
+  it.each([
+    '--recover', '--title', '-t', '--body', '-b', '--body-file', '-F', '--base', '-B',
+    '--head', '-H', '--reviewer', '-r', '--assignee', '-a', '--label', '-l',
+    '--milestone', '-m', '--project', '-p', '--template', '-T', '--hostname', '--config',
+  ])('does not read a %s value as a selector', async (flag) => {
+    const root = incompleteRepo();
+    const command = `gh pr create --title x ${flag} -Rother/thing`;
+    expectLocalGates(await sprintCompletionGuard(prCreate(command, root), root), root, command);
+  });
+
+  it('handles attached values, equals values and boolean short-flag clusters', async () => {
+    const root = incompleteRepo();
+    for (const command of [
+      'gh pr create --recover "-R other/thing" --title x',
+      'gh pr create --recover -R --title x',
+      'gh pr create --recover=-Rother/thing --title x',
+      'gh pr create -tRother/thing',
+      'gh pr create -dt-Rother/thing',
+      'gh pr create --title=x -dRacme/app',
+      'gh pr create -dR acme/app --title x',
+    ]) expectLocalGates(await sprintCompletionGuard(prCreate(command, root), root), root, command);
+    for (const command of [
+      'gh pr create -dRother/thing --title x',
+      'gh pr create -dR other/thing --title x',
+      'gh pr create -wdR=other/thing',
+      'gh pr create --recover -Racme/app --repo other/thing',
+    ]) expectOtherRepository(await sprintCompletionGuard(prCreate(command, root), root), command);
+  });
+
+  it('recognizes create/new with value flags before the subcommands', async () => {
+    const root = incompleteRepo();
+    for (const command of [
+      'gh pr new --title x',
+      'gh -t x pr create',
+      'gh pr --title x create',
+      'gh --recover -Rother/thing pr create',
+      'gh pr --recover -Rother/thing create',
+    ]) expectLocalGates(await sprintCompletionGuard(prCreate(command, root), root), root, command);
+  });
+
+  it('reads env GH_REPO assignments and gives explicit repo flags precedence', async () => {
+    const root = incompleteRepo();
+    for (const command of [
+      'env GH_REPO=other/thing gh pr create --title x',
+      'env FOO=1 GH_REPO=other/thing gh pr create --title x',
+      'FOO=1 env GH_REPO=other/thing gh pr create --title x',
+      'GH_REPO=acme/app env GH_REPO=other/thing gh pr create --title x',
+      'env GH_REPO=acme/app gh pr create -R other/thing --title x',
+      'env GH_REPO=acme/app gh pr create --repo=other/thing --title x',
+      'GH_REPO=other/thing gh pr create -R "" --title x',
+    ]) expectOtherRepository(await sprintCompletionGuard(prCreate(command, root), root), command);
+    for (const command of [
+      'env GH_REPO=acme/app gh pr create --title x',
+      'env GH_REPO=other/thing gh pr create -R acme/app --title x',
+      'env GH_REPO=other/thing gh pr create --repo=acme/app --title x',
+      'GH_REPO=other/thing gh pr create --repo acme/app --title x',
+      'GH_REPO=other/thing env -u GH_REPO gh pr create --title x',
+      'env GH_REPO= gh pr create --title x',
+      'gh pr create --title GH_REPO=other/thing',
+      'gh pr create --title x GH_REPO=other/thing',
+    ]) expectLocalGates(await sprintCompletionGuard(prCreate(command, root), root), root, command);
   });
 });
 
