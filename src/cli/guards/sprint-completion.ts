@@ -75,9 +75,19 @@ function checkStaleness(sprint: SprintId, cwd: string): string | null {
 
 /** Block `gh pr create` when gates are incomplete or scorecard is missing. */
 function handlePreToolUse(input: HookInput, cwd: string): GuardResult {
-  const commandContext = prCreateCommandContext(input, cwd);
-  if (!commandContext) return {};
+  // Every `gh pr create` in the invocation is judged in its own checkout: in
+  // `gh pr create -R other/x && gh pr create`, the second one must not ride on
+  // the first. A denial wins; otherwise the first advisory note is kept.
+  let advisory: GuardResult = {};
+  for (const commandContext of prCreateCommandContexts(input, cwd)) {
+    const result = checkPrCreate(commandContext);
+    if (result.decision === 'deny') return result;
+    if (Object.keys(advisory).length === 0) advisory = result;
+  }
+  return advisory;
+}
 
+function checkPrCreate(commandContext: PrCreateContext): GuardResult {
   // Everything below describes the checkout the command actually runs in: its
   // sprint evidence, its scorecards, its branch. Never the session's cwd.
   const guardCwd = resolveRepoSourceCwd(commandContext.cwd);
@@ -220,11 +230,13 @@ interface PrCreateContext {
   repo?: string;
 }
 
-function prCreateCommandContext(input: HookInput, cwd: string): PrCreateContext | null {
-  const segment = commandSegments(input, cwd).find(({ words }) => isGhPrCreateCommand(words));
-  if (!segment) return null;
-  const repo = ghRepoSelector(segment.words);
-  return { cwd: segment.cwd, ...(repo ? { repo } : {}) };
+function prCreateCommandContexts(input: HookInput, cwd: string): PrCreateContext[] {
+  return commandSegments(input, cwd)
+    .filter(({ words }) => isGhPrCreateCommand(words))
+    .map(segment => {
+      const repo = ghRepoSelector(segment.words);
+      return { cwd: segment.cwd, ...(repo ? { repo } : {}) };
+    });
 }
 
 /** `gh pr create` flags that consume the following word, so it is never read as a flag. */
@@ -255,7 +267,8 @@ function ghRepoSelector(words: string[]): string | null {
     } else if (word.startsWith('--repo=')) {
       repo = word.slice('--repo='.length);
     } else if (/^-R.+/.test(word)) {
-      repo = word.slice(2);
+      // `-Rx` and `-R=x` both name x.
+      repo = word.slice(2).replace(/^=/, '');
     } else if (GH_PR_CREATE_FLAGS_WITH_VALUE.has(word)) {
       i++;
     }
@@ -370,7 +383,9 @@ function isGhPrCreateCommand(words: string[]): boolean {
   i++;
 
   i = skipGhGlobalFlags(words, i);
-  return words[i] === 'pr' && words[i + 1] === 'create';
+  if (words[i] !== 'pr') return false;
+  // `--repo`/`-R` are accepted between `pr` and `create` as well.
+  return words[skipGhGlobalFlags(words, i + 1)] === 'create';
 }
 
 const GH_GLOBAL_FLAGS_WITH_VALUE = new Set([

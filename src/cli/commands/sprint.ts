@@ -932,6 +932,26 @@ async function autoClaimSprint(cwd: string, sprint: SprintId, explicitActor?: st
   }
 }
 
+/**
+ * The valid sprint state, or exit 1 saying exactly why there is none. Corrupt
+ * evidence names its file, field and repair; a planned draft is "no sprint in
+ * progress" and is left alone. Mutating commands go through this so none of
+ * them reports "No active sprint" for a file that exists but is bad.
+ */
+function requireSprintState(cwd: string): SprintState {
+  const loaded = loadSprintStateResult(cwd);
+  if (loaded.status === 'valid') return loaded.state;
+  if (loaded.status === 'corrupt') {
+    printCorruptSprintState('Refusing to change sprint state: corrupt evidence was preserved.', loaded.diagnosis);
+  } else if (loaded.status === 'draft') {
+    console.error(`No sprint is in progress: ${loaded.path} is a planned draft, left untouched.`);
+    console.error("Run 'slope sprint start --number=N' after setting the draft aside, keeping a copy: " + `\`mv "${loaded.path}" "${loaded.path}.bak"\`.`);
+  } else {
+    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
+  }
+  process.exit(1);
+}
+
 function phaseCommand(args: string[], cwd: string): void {
   const phaseInput = args[0];
   if (!phaseInput || !isSprintPhase(phaseInput)) {
@@ -939,13 +959,14 @@ function phaseCommand(args: string[], cwd: string): void {
     process.exit(1);
   }
 
-  const before = loadSprintState(cwd);
-  if (!before) {
-    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
+  const before = requireSprintState(cwd);
+
+  // Report success only when the write happened: the mutator refuses (returns
+  // null) if the state went bad or disappeared since it was read.
+  if (!updateSprintPhase(cwd, phaseInput)) {
+    console.error(`Error: could not update the sprint phase; sprint state changed or became invalid. Run \`slope doctor\` to see why.`);
     process.exit(1);
   }
-
-  updateSprintPhase(cwd, phaseInput);
   if (before.phase === phaseInput) {
     console.log(`Sprint ${sprintNumberForCwd(cwd, before.sprint)} already in ${phaseInput} phase.`);
   } else {
@@ -975,11 +996,7 @@ function gateCommand(args: string[], cwd: string): void {
     console.error('Error: review evidence options only apply to code_review and architect_review gates.');
     process.exit(1);
   }
-  const state = loadSprintState(cwd);
-  if (!state) {
-    console.error("No active sprint. Run 'slope sprint start --number=N' first.");
-    process.exit(1);
-  }
+  const state = requireSprintState(cwd);
 
   if (isReviewGateName(gateName)) {
     const required = isRequiredReviewGate(state, gateName);
@@ -1197,6 +1214,9 @@ async function statusCommand(
 ): Promise<void> {
   const state = loadSprintState(cwd);
   if (!state) {
+    // A file that exists but is bad must not read as "no sprint".
+    const loaded = loadSprintStateResult(cwd);
+    const diagnosis = loaded.status === 'corrupt' ? loaded.diagnosis : undefined;
     if (json) {
       console.log(JSON.stringify({
         mode: 'lifecycle',
@@ -1207,7 +1227,13 @@ async function statusCommand(
         review_gates: null,
         actors: [],
         claims: [],
+        ...(diagnosis ? { evidence_error: { path: diagnosis.path, field: diagnosis.field, message: diagnosis.message } } : {}),
       }, null, 2));
+      return;
+    }
+    if (diagnosis) {
+      console.log('Sprint state is corrupt and was preserved.');
+      for (const line of formatSprintStateDiagnosis(diagnosis)) console.log(line);
       return;
     }
     console.log('No active sprint state.');

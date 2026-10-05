@@ -315,6 +315,10 @@ function sprintKeyOrNull(value: unknown): SprintId | null {
 /** Lenient shape check + normalization shared by every reader. Null when unusable. */
 function normalizeSprintState(raw: any): SprintState | null {
   if (!raw || typeof raw !== 'object') return null;
+  // A planned draft is no sprint, for the lenient readers too: all-false gates
+  // would otherwise pass the checks below and look like an active sprint to
+  // every caller that does not use the strict loader.
+  if (isPlannedDraft(raw)) return null;
   const sprint = sprintKeyOrNull(raw.sprint);
   if (sprint === null || typeof raw.phase !== 'string' || !raw.gates || typeof raw.gates !== 'object') {
     return null;
@@ -620,8 +624,11 @@ export function sprintStatePath(cwd: string): string {
   const sharedRoot = resolveRepoStateCwd(cwd);
   if (samePath(localRoot, sharedRoot)) return shared;
   const local = join(localRoot, SPRINT_STATE_FILE);
-  if (existsSync(local) && isTrackedSprintState(localRoot)) return local;
-  if (existsSync(shared) && isTrackedSprintState(sharedRoot)) return local;
+  // Tracked means committed to this branch, whether or not the file is on disk
+  // right now: a deleted-but-tracked file is missing evidence for this branch,
+  // not licence to read the primary's.
+  if (isTrackedSprintState(localRoot)) return local;
+  if (isTrackedSprintState(sharedRoot)) return local;
   return shared;
 }
 
