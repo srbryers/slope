@@ -24,6 +24,7 @@ import type { ResolvedActor } from './actor.js';
 import { loadConfig } from './config.js';
 import {
   createSprintState,
+  formatSprintStateDiagnosis,
   isSprintComplete,
   isValidSprintStateEvidence,
   loadSprintStateResult,
@@ -445,7 +446,7 @@ export function inspectSprintRollover(cwd: string, input: SprintRolloverInput): 
   const loaded = loadRolloverRoadmap(cwd);
   const stateResult = loadSprintStateResult(cwd);
   if (stateResult.status === 'corrupt') {
-    throw new SprintRolloverError(`Sprint state is corrupt and was preserved at ${relative(cwd, stateResult.path)}.`);
+    throw new SprintRolloverError(`Sprint state is corrupt and was preserved. ${formatSprintStateDiagnosis(stateResult.diagnosis).join(' ')}`);
   }
   const completed = loadCompletionEvidence(cwd).sprintIds;
   return assessSprintRollover(
@@ -835,8 +836,11 @@ export function performSprintRollover(
   if (initialState.status === 'missing') {
     throw new SprintRolloverError('No sprint state exists to roll over.');
   }
+  if (initialState.status === 'draft') {
+    throw new SprintRolloverError(`No sprint is in progress to roll over: ${initialState.path} is a planned draft.`);
+  }
   if (initialState.status === 'corrupt') {
-    throw new SprintRolloverError(`Sprint state is corrupt and was preserved at ${relative(cwd, initialState.path)}.`);
+    throw new SprintRolloverError(`Sprint state is corrupt and was preserved. ${formatSprintStateDiagnosis(initialState.diagnosis).join(' ')}`);
   }
 
   let record: SprintRolloverAuditRecord | undefined;
