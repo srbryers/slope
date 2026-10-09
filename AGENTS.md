@@ -1,5 +1,7 @@
 # SLOPE Project
 
+Read [CI/CD.md](CI/CD.md) first for development checks and delivery evidence. Existing policy and approval gates remain in force.
+
 This project uses the SLOPE framework for sprint tracking.
 
 ## Commands
