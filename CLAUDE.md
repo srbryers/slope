@@ -1,5 +1,7 @@
 # SLOPE Monorepo
 
+Read [CI/CD.md](CI/CD.md) first for development checks and delivery evidence. Existing policy and approval gates remain in force.
+
 Sprint Lifecycle & Operational Performance Engine — pluggable-metaphor sprint scoring.
 
 ## General Note on tone and style
