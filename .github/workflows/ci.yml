@@ -1,3 +1,12 @@
+# Tiered gate policy (Sebastian, 2026-10-23 - all projects)
+# A full test/gate suite is a launch-phase control, not a build-phase blocker.
+# This project is in its build phase: PRs run impacted checks only.
+# The full suite runs on: workflow or check-script changes, high-risk areas
+# (auth, payments/credits, data persistence, migrations), shared/core paths,
+# a ci:full label, every push to the mainline after merge, and nightly.
+# Ratchet: the verification phase restores full-on-PR for user-facing
+# surfaces; launch readiness makes the full suite unconditional.
+# Never weaken an assertion to fit a tier.
 name: CI
 
 on:
