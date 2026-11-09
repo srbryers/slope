@@ -19,7 +19,11 @@ jobs:
   # until #725 clears.
   ci:
     name: ci (${{ matrix.leg }})
-    runs-on: ${{ matrix.runs_on }}
+    # fromJSON is load-bearing: GitHub merges array values across matrix
+    # include entries, so both legs ended up with the Windows label set and
+    # the Mac leg ran on the Windows machine (PR #808, first run). Carrying
+    # each label set as a JSON string keeps the legs apart.
+    runs-on: ${{ fromJSON(matrix.runs_on) }}
     continue-on-error: ${{ matrix.allow_failure }}
     strategy:
       fail-fast: false
@@ -27,7 +31,7 @@ jobs:
         include:
           # Our own runner on the Mac Studio.
           - leg: macos
-            runs_on: [self-hosted, slope]
+            runs_on: '["self-hosted", "slope"]'
             pg: true
             allow_failure: false
           # Our own runner on SRB-Desktop. Windows, because the path bugs
@@ -38,7 +42,7 @@ jobs:
           # on main for an unknown stretch before anyone ran the suite
           # there (#712).
           - leg: windows
-            runs_on: [self-hosted, Windows, X64, slope]
+            runs_on: '["self-hosted", "Windows", "X64", "slope"]'
             pg: false
             allow_failure: true
 
@@ -67,8 +71,8 @@ jobs:
           # refuses to start without a valid one.
           export LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
           export PGDATA="$RUNNER_TEMP/slope-pg"
-          "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust > /dev/null
-          "$PGBIN/pg_ctl" -D "$PGDATA" -o "-p 5433" -l "$RUNNER_TEMP/slope-pg.log" -w start > /dev/null
+          "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust
+          "$PGBIN/pg_ctl" -D "$PGDATA" -o "-p 5433" -l "$RUNNER_TEMP/slope-pg.log" -w start
           "$PGBIN/createdb" -h localhost -p 5433 -U postgres slope_test
 
       - name: Install dependencies
