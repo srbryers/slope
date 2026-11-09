@@ -20,63 +20,40 @@ on:
     branches: ['**']
 
 jobs:
+  # One job, two legs, one per operating system. This used to be two jobs
+  # (ci and ci-windows) running identical steps, which Tiaki's drift audit
+  # rightly flagged as a duplicate. The legs differ in exactly the ways the
+  # old jobs differed: the Mac leg runs the Postgres store tests, the
+  # Windows leg does not, and the Windows leg reports without blocking
+  # until #725 clears.
   ci:
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: slope
-          POSTGRES_DB: slope_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-
-      - uses: pnpm/action-setup@v6
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
-
-      - name: Test
-        run: pnpm test
-        env:
-          SLOPE_TEST_PG_URL: postgresql://postgres:slope@localhost:5432/slope_test
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-  # Windows, because the path bugs that only appear there were invisible to a
-  # Linux-only matrix. git reports forward slashes on every platform while Node
-  # returns backslashes, so a raw string comparison is always true on Windows
-  # and always false-negative in CI. Five tests were broken on main for an
-  # unknown stretch before anyone ran the suite there (#712).
-  #
-  # No Postgres service: the PG store tests skip without SLOPE_TEST_PG_URL, and
-  # the point of this job is path and filesystem behaviour, which the SQLite
-  # store already exercises. Keeping it lean keeps it fast enough to stay on.
-  ci-windows:
-    runs-on: windows-latest
-    # Reporting, not blocking, until the backlog it exposed is cleared. Its
-    # first run found 17 failures; #712 fixed the five that were known plus a
-    # real runtime bug, and 9 remain. Blocking now would stop every unrelated
-    # PR on a cleanup nobody has scheduled. Tracked in #725 — flip this off
-    # once that closes, because a green job nobody must satisfy decays.
-    continue-on-error: true
+    name: ci (${{ matrix.leg }})
+    # fromJSON is load-bearing: GitHub merges array values across matrix
+    # include entries, so both legs ended up with the Windows label set and
+    # the Mac leg ran on the Windows machine (PR #808, first run). Carrying
+    # each label set as a JSON string keeps the legs apart.
+    runs-on: ${{ fromJSON(matrix.runs_on) }}
+    continue-on-error: ${{ matrix.allow_failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Our own runner on the Mac Studio.
+          - leg: macos
+            runs_on: '["self-hosted", "macOS", "slope"]'
+            pg: true
+            allow_failure: false
+          # Our own runner on SRB-Desktop. Windows, because the path bugs
+          # that only appear there were invisible to a Linux-only matrix.
+          # git reports forward slashes on every platform while Node returns
+          # backslashes, so a raw string comparison is always true on
+          # Windows and always false-negative in CI. Five tests were broken
+          # on main for an unknown stretch before anyone ran the suite
+          # there (#712).
+          - leg: windows
+            runs_on: '["self-hosted", "Windows", "X64", "slope"]'
+            pg: false
+            allow_failure: true
 
     steps:
       - uses: actions/checkout@v6
@@ -87,14 +64,50 @@ jobs:
 
       - uses: pnpm/action-setup@v6
 
+      # Mac runners get no GitHub service containers, so the Mac leg starts
+      # its own throwaway Postgres from the Studio's Homebrew install and
+      # throws it away with the runner temp dir. Trust auth is safe here:
+      # the port is only reachable from this machine, for this run.
+      # The Windows leg skips this: the PG store tests skip without
+      # SLOPE_TEST_PG_URL, and the point of that leg is path and filesystem
+      # behaviour, which the SQLite store already exercises.
+      - name: Start throwaway Postgres (Mac leg)
+        if: matrix.pg
+        shell: bash
+        run: |
+          PGBIN=/opt/homebrew/opt/postgresql@17/bin
+          # The runner service has no locale set, and Postgres on macOS
+          # refuses to start without a valid one.
+          export LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+          export PGDATA="$RUNNER_TEMP/slope-pg"
+          # Clear any server a failed or cancelled run left behind.
+          "$PGBIN/pg_ctl" -D "$PGDATA" stop > /dev/null 2>&1 || true
+          rm -rf "$PGDATA"
+          "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust
+          "$PGBIN/pg_ctl" -D "$PGDATA" -o "-p 5433" -l "$RUNNER_TEMP/slope-pg.log" -w start
+          "$PGBIN/createdb" -h localhost -p 5433 -U postgres slope_test
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build
 
-      - name: Test
+      - name: Test (with Postgres)
+        if: matrix.pg
+        run: pnpm test
+        env:
+          SLOPE_TEST_PG_URL: postgresql://postgres@localhost:5433/slope_test
+
+      - name: Test (no Postgres)
+        if: ${{ !matrix.pg }}
         run: pnpm test
 
       - name: Typecheck
         run: pnpm typecheck
+      - name: Stop throwaway Postgres (Mac leg)
+        if: ${{ always() && matrix.pg }}
+        shell: bash
+        run: |
+          export PGDATA="$RUNNER_TEMP/slope-pg"
+          /opt/homebrew/opt/postgresql@17/bin/pg_ctl -D "$PGDATA" stop || true

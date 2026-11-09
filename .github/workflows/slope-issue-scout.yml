@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   scout:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, slope]
     env:
       GH_TOKEN: ${{ github.token }}
 

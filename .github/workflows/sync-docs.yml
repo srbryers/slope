@@ -7,7 +7,7 @@ on:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, slope]
     permissions:
       contents: read
     env:
@@ -30,11 +30,10 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Test
-        run: pnpm test
-
-      - name: Typecheck
-        run: pnpm typecheck
+      # No test or typecheck steps here on purpose: CI already ran both on
+      # this code before it could be tagged, and this job only needs the
+      # built CLI to generate the manifest. Repeating them made this job a
+      # partial copy of CI (flagged by the Tiaki drift audit).
 
       - name: Generate manifest
         run: node dist/cli/index.js docs generate --pretty --stdout > docs-manifest.json
