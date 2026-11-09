@@ -31,7 +31,7 @@ jobs:
         include:
           # Our own runner on the Mac Studio.
           - leg: macos
-            runs_on: '["self-hosted", "slope"]'
+            runs_on: '["self-hosted", "macOS", "slope"]'
             pg: true
             allow_failure: false
           # Our own runner on SRB-Desktop. Windows, because the path bugs
@@ -71,6 +71,9 @@ jobs:
           # refuses to start without a valid one.
           export LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
           export PGDATA="$RUNNER_TEMP/slope-pg"
+          # Clear any server a failed or cancelled run left behind.
+          "$PGBIN/pg_ctl" -D "$PGDATA" stop > /dev/null 2>&1 || true
+          rm -rf "$PGDATA"
           "$PGBIN/initdb" -D "$PGDATA" -U postgres --auth=trust
           "$PGBIN/pg_ctl" -D "$PGDATA" -o "-p 5433" -l "$RUNNER_TEMP/slope-pg.log" -w start
           "$PGBIN/createdb" -h localhost -p 5433 -U postgres slope_test
@@ -93,3 +96,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+      - name: Stop throwaway Postgres (Mac leg)
+        if: ${{ always() && matrix.pg }}
+        shell: bash
+        run: |
+          export PGDATA="$RUNNER_TEMP/slope-pg"
+          /opt/homebrew/opt/postgresql@17/bin/pg_ctl -D "$PGDATA" stop || true

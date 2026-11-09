@@ -7,7 +7,7 @@ on:
 
 jobs:
   sync:
-    runs-on: [self-hosted, slope]
+    runs-on: [self-hosted, macOS, slope]
     permissions:
       contents: read
     env:
