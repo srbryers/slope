@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { detectPlatforms, type InitProvider } from './init.js';
 import { detectActiveHarnessGuardShims } from '../harness-hook-status.js';
+import { formatSprintStateDiagnosis, loadSprintStateResult, sprintStatePath } from '../sprint-state.js';
 import { GUARD_DEFINITIONS } from '../../core/guard.js';
 import { hasMetaphor } from '../../core/metaphor.js';
 import { detectAdapter, SLOPE_BIN_PREAMBLE, writeOrUpdateManagedScript } from '../../core/harness.js';
@@ -82,7 +83,37 @@ export function runDoctorChecks(cwd: string): DoctorCheck[] {
   // 14. Branch hygiene — stale merged + remote-tracking refs (#322)
   checks.push(...checkBranchHygiene(cwd));
 
+  // 15. Sprint evidence — the same file and diagnosis the sprint-completion guard reports (#742)
+  checks.push(...checkSprintState(cwd));
+
   return checks;
+}
+
+/** Report the sprint-state file that governs `cwd` using the guard's own loader and wording. */
+function checkSprintState(cwd: string): DoctorCheck[] {
+  const loaded = loadSprintStateResult(cwd);
+  switch (loaded.status) {
+    case 'missing':
+      return [];
+    case 'draft':
+      return [{
+        name: 'sprint-state',
+        status: 'ok',
+        message: `${loaded.path} is a planned draft; no sprint in progress`,
+      }];
+    case 'valid':
+      return [{
+        name: 'sprint-state',
+        status: 'ok',
+        message: `${sprintStatePath(cwd)} valid (sprint ${loaded.state.sprint}, phase ${loaded.state.phase})`,
+      }];
+    case 'corrupt':
+      return [{
+        name: 'sprint-state',
+        status: 'fail',
+        message: ['Sprint evidence is invalid and was preserved.', ...formatSprintStateDiagnosis(loaded.diagnosis)].join('\n         '),
+      }];
+  }
 }
 
 function stateNote(stateCwd: string, cwd: string): string {
